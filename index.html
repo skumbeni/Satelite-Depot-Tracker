@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Satellite Depot - Stock Management System</title>
+<script src="https://cdn.tailwindcss.com" onerror="window.__depotLibFailed=true"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" onerror="window.__depotLibFailed=true"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" onerror="window.__depotLibFailed=true"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" onerror="window.__depotLibFailed=true"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js" onerror="window.__depotLibFailed=true"></script>
+<style>
+  :root{ --emerald:#047857; --emerald-dark:#065f46; }
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:4px;}
+  .card{background:#fff;border-radius:0.75rem;box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:0.375rem;border-radius:0.5rem;font-weight:600;font-size:0.875rem;padding:0.5rem 0.9rem;cursor:pointer;transition:background .15s;border:none;}
+  .btn-primary{background:var(--emerald);color:#fff;}
+  .btn-primary:hover{background:var(--emerald-dark);}
+  .btn-outline{background:#fff;border:1px solid #e5e7eb;color:#374151;}
+  .btn-outline:hover{background:#f9fafb;}
+  .btn:disabled{opacity:.6;cursor:not-allowed;}
+  .input, select.input, textarea.input{width:100%;border:1px solid #e5e7eb;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;outline:none;background:#fff;}
+  .input:focus{border-color:var(--emerald);box-shadow:0 0 0 3px rgba(4,120,87,0.1);}
+  .label{font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:0.25rem;display:block;}
+  .badge{display:inline-flex;align-items:center;padding:0.1rem 0.55rem;border-radius:9999px;font-size:0.7rem;font-weight:700;white-space:nowrap;}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100;padding:1rem;}
+  .modal-box{background:#fff;border-radius:0.9rem;max-width:32rem;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;}
+  .toast-wrap{position:fixed;top:1rem;right:1rem;z-index:200;display:flex;flex-direction:column;gap:0.5rem;}
+  .toast{padding:0.75rem 1rem;border-radius:0.6rem;color:#fff;font-size:0.85rem;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.15);animation:slidein .2s ease-out;max-width:320px;}
+  @keyframes slidein{from{transform:translateX(20px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+  .toast.success{background:#047857;}
+  .toast.error{background:#dc2626;}
+  table.datatable{width:100%;font-size:0.85rem;border-collapse:collapse;}
+  table.datatable th{text-align:left;padding:0.5rem 0.75rem;font-size:0.72rem;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;white-space:nowrap;}
+  table.datatable td{padding:0.55rem 0.75rem;border-bottom:1px solid #f3f4f6;}
+  table.datatable tr:hover td{background:#f9fafb;}
+  .skeleton{background:linear-gradient(90deg,#f3f4f6 25%,#e5e7eb 37%,#f3f4f6 63%);background-size:400% 100%;animation:shimmer 1.4s ease infinite;border-radius:0.5rem;}
+  @keyframes shimmer{0%{background-position:100% 50%;}100%{background-position:0 50%;}}
+  #sidebar{transition:transform .2s ease;}
+  .nav-item{display:flex;align-items:center;gap:0.7rem;padding:0.55rem 0.75rem;border-radius:0.55rem;font-size:0.875rem;font-weight:500;color:#6b7280;cursor:pointer;}
+  .nav-item:hover{color:#111827;background:#f3f4f6;}
+  .nav-item.active{background:#ecfdf5;color:#065f46;font-weight:600;}
+</style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+<div id="toast-wrap" class="toast-wrap"></div>
+<div id="root"></div>
+
+<script>
+/* =========================================================================
+   SATELLITE DEPOT STOCK MANAGEMENT SYSTEM
+   Single-file HTML + Firebase (Firestore) build
+   Converted from a Next.js/Prisma reference project.
+
+   ---------------------------------------------------------------------
+   SETUP INSTRUCTIONS
+   ---------------------------------------------------------------------
+   1. Create a Firebase project at https://console.firebase.google.com
+   2. Enable "Firestore Database" (production mode is fine).
+   3. Enable "Authentication" -> Sign-in method -> Anonymous (this is used
+      only to satisfy Firestore's request.auth != null security rule -
+      actual login is username/password checked against the `users`
+      collection below, matching the original app's login screen).
+   4. Copy your web app config into FIREBASE_CONFIG below.
+   5. Paste the FIRESTORE SECURITY RULES (bottom of this comment block)
+      into Firestore -> Rules.
+   6. Open this file in a browser (or host it on GitHub Pages). On first
+      run, click "Seed Demo Data" on the login screen to create the demo
+      users, stock items and personnel (same as the original seed route).
+
+   Demo credentials after seeding:
+     Manager  : manager / manager123
+     SDC Clerk: sdc1 / sdc123
+     SDC Clerk: sdc2 / sdc123
+
+   ---------------------------------------------------------------------
+   FIRESTORE SECURITY RULES (copy into Firebase Console -> Firestore -> Rules)
+   ---------------------------------------------------------------------
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /{document=**} {
+         allow read, write: if request.auth != null;
+       }
+     }
+   }
+
+   NOTE: Because login here is a simple username/password check against
+   a Firestore collection (not Firebase Auth's real user system), these
+   rules only require *some* signed-in (anonymous) session - they do not
+   verify who is logged into the app itself. This mirrors the original
+   app's simplicity (plaintext passwords, no server-side session) and is
+   fine for an internal single-depot tool, but should not be treated as
+   production-grade security for sensitive data.
+   ========================================================================= */
+
+const FIREBASE_CONFIG = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+let auth, db, LIBS_OK = true;
+try {
+  if (typeof firebase === 'undefined' || typeof Chart === 'undefined') {
+    throw new Error('One or more required libraries (Firebase / Chart.js / Tailwind) failed to load from the CDN.');
+  }
+  firebase.initializeApp(FIREBASE_CONFIG);
+  auth = firebase.auth();
+  db = firebase.firestore();
+} catch (e) {
+  LIBS_OK = false;
+  console.error('Startup error:', e);
+}
+
+if (!LIBS_OK || window.__depotLibFailed) {
+  document.addEventListener('DOMContentLoaded', showLibraryError);
+  if (document.readyState !== 'loading') showLibraryError();
+}
+
+function showLibraryError(){
+  document.getElementById('root').innerHTML = `
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem;background:#fffbeb;font-family:sans-serif;">
+      <div style="max-width:32rem;background:#fff;border-radius:1rem;padding:2rem;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+        <h1 style="font-size:1.25rem;font-weight:700;color:#92400e;margin-bottom:0.75rem;">Couldn't load required resources</h1>
+        <p style="font-size:0.9rem;color:#374151;line-height:1.6;margin-bottom:0.75rem;">
+          This app loads Tailwind CSS, Chart.js, and Firebase from public CDNs, and one or more of those failed to load.
+        </p>
+        <p style="font-size:0.9rem;color:#374151;line-height:1.6;margin-bottom:0.75rem;">This usually means one of the following:</p>
+        <ul style="font-size:0.85rem;color:#4b5563;line-height:1.7;margin:0 0 1rem 1.25rem;">
+          <li>You're viewing this inside an in-app file preview that blocks external network requests - try downloading the file and opening it directly in a browser (Chrome, Safari, etc.) instead.</li>
+          <li>There's no internet connection right now.</li>
+          <li>A firewall, ad-blocker, or corporate network is blocking cdn.tailwindcss.com, cdn.jsdelivr.net, or gstatic.com.</li>
+        </ul>
+        <p style="font-size:0.8rem;color:#9ca3af;">Reload the page once connected, or open the downloaded HTML file directly in your browser.</p>
+      </div>
+    </div>`;
+}
+
+/* ---------------------------- Global State ---------------------------- */
+const state = {
+  user: null,           // { id, username, name, role, phone }
+  page: 'dashboard',
+  sidebarOpen: false,
+  stockItems: [],
+  stockTransactions: [],
+  maizePurchases: [],
+  maizeDispatches: [],
+  personnel: [],
+  laborPayments: [],
+  loading: false,
+  charts: {},
+};
+
+const NAV_ITEMS = [
+  { page: 'dashboard', label: 'Dashboard', icon: iconDashboard(), managerOnly: false },
+  { page: 'stock-movement', label: 'Stock Movement', icon: iconSwap(), managerOnly: false },
+  { page: 'maize-purchases', label: 'Maize Purchases', icon: iconCart(), managerOnly: false },
+  { page: 'maize-dispatches', label: 'Maize Dispatches', icon: iconTruck(), managerOnly: false },
+  { page: 'personnel', label: 'Personnel', icon: iconUsers(), managerOnly: true },
+  { page: 'labor-payments', label: 'Labor Payments', icon: iconCash(), managerOnly: true },
+  { page: 'reports', label: 'Reports & WhatsApp', icon: iconChart(), managerOnly: false },
+];
+
+/* ------------------------------ Utilities ------------------------------ */
+function fmtNum(n){ return Number(n||0).toLocaleString(); }
+function fmtDate(d){ return new Date(d).toLocaleDateString(); }
+function todayStr(){ return new Date().toISOString().split('T')[0]; }
+function esc(s){ return (s===null||s===undefined)?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function toast(msg, type='success'){
+  const wrap = document.getElementById('toast-wrap');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, 3200);
+}
+
+/* -------------------------------- Icons -------------------------------- */
+function svgIcon(path, extra=''){ return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 shrink-0" ${extra}>${path}</svg>`; }
+function iconDashboard(){ return svgIcon('<rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>'); }
+function iconSwap(){ return svgIcon('<path d="M17 3l4 4-4 4"/><path d="M3 7h18"/><path d="M7 21l-4-4 4-4"/><path d="M21 17H3"/>'); }
+function iconCart(){ return svgIcon('<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>'); }
+function iconTruck(){ return svgIcon('<rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>'); }
+function iconUsers(){ return svgIcon('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'); }
+function iconCash(){ return svgIcon('<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>'); }
+function iconChart(){ return svgIcon('<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>'); }
+function iconPlus(){ return svgIcon('<path d="M12 5v14M5 12h14"/>'); }
+function iconRefresh(){ return svgIcon('<path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>'); }
+function iconWheat(){ return svgIcon('<path d="M12 22V2"/><path d="M17 8c0 2-2 3-5 3s-5-1-5-3 2-4 5-4 5 2 5 4z"/><path d="M17 14c0 2-2 3-5 3s-5-1-5-3 2-4 5-4 5 2 5 4z"/>', 'style="width:2rem;height:2rem;"'); }
+function iconMenu(){ return svgIcon('<path d="M3 12h18M3 6h18M3 18h18"/>'); }
+function iconX(){ return svgIcon('<path d="M18 6L6 18M6 6l12 12"/>'); }
+function iconLogout(){ return svgIcon('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>'); }
+function iconWhatsapp(){ return svgIcon('<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>'); }
+function iconCopy(){ return svgIcon('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'); }
+
+/* ----------------------------- Auth / Login ----------------------------- */
+async function ensureAnonAuth(){
+  if (!auth.currentUser) {
+    await auth.signInAnonymously();
+  }
+}
+
+async function login(username, password){
+  const snap = await db.collection('users').where('username','==',username).limit(1).get();
+  if (snap.empty) throw new Error('Invalid username or password');
+  const doc = snap.docs[0];
+  const u = doc.data();
+  if (u.password !== password) throw new Error('Invalid username or password');
+  await ensureAnonAuth();
+  const user = { id: doc.id, username: u.username, name: u.name, role: u.role, phone: u.phone || null };
+  state.user = user;
+  localStorage.setItem('depot-auth', JSON.stringify(user));
+  return user;
+}
+
+function logout(){
+  state.user = null;
+  localStorage.removeItem('depot-auth');
+  render();
+}
+
+async function seedDemoData(){
+  await ensureAnonAuth();
+  const userCount = (await db.collection('users').limit(1).get()).size;
+  if (userCount > 0) { toast('Demo data already exists'); return; }
+
+  const batch = db.batch();
+  const usersRef = db.collection('users');
+  batch.set(usersRef.doc(), { username:'manager', password:'manager123', name:'Depot Manager', role:'MANAGER', phone:'+260XXXXXXXXX' });
+  batch.set(usersRef.doc(), { username:'sdc1', password:'sdc123', name:'SDC Clerk 1', role:'SDC', phone:null });
+  batch.set(usersRef.doc(), { username:'sdc2', password:'sdc123', name:'SDC Clerk 2', role:'SDC', phone:null });
+
+  const stockItemsRef = db.collection('stockItems');
+  [['Tents','pcs'],['Sprayers','pcs'],['Twine','rolls'],['Markers','pcs'],['Empty Grain Bags','pcs']].forEach(([name,unit])=>{
+    batch.set(stockItemsRef.doc(), { name, unit });
+  });
+
+  const personnelRef = db.collection('personnel');
+  batch.set(personnelRef.doc(), { name:'SDC Personnel 1', role:'SDC', rateOrSalary:5000, paymentType:'MONTHLY', phone:null, isActive:true });
+  batch.set(personnelRef.doc(), { name:'SDC Personnel 2', role:'SDC', rateOrSalary:5000, paymentType:'MONTHLY', phone:null, isActive:true });
+  batch.set(personnelRef.doc(), { name:'Guard 1', role:'GUARD', rateOrSalary:3000, paymentType:'MONTHLY', phone:null, isActive:true });
+  batch.set(personnelRef.doc(), { name:'Guard 2', role:'GUARD', rateOrSalary:3000, paymentType:'MONTHLY', phone:null, isActive:true });
+
+  await batch.commit();
+  toast('Demo data seeded! Try manager / manager123');
+}
+
+/* ------------------------------ Data Fetch ------------------------------ */
+async function fetchAllData(){
+  state.loading = true;
+  try{
+    const [stockItemsSnap, stockTxSnap, purchasesSnap, dispatchesSnap, personnelSnap, paymentsSnap] = await Promise.all([
+      db.collection('stockItems').orderBy('name').get(),
+      db.collection('stockTransactions').orderBy('date','desc').get(),
+      db.collection('maizePurchases').orderBy('date','desc').get(),
+      db.collection('maizeDispatches').orderBy('date','desc').get(),
+      db.collection('personnel').orderBy('name').get(),
+      db.collection('laborPayments').orderBy('date','desc').get(),
+    ]);
+    state.stockItems = stockItemsSnap.docs.map(d=>({id:d.id, ...d.data()}));
+    state.stockTransactions = stockTxSnap.docs.map(d=>({id:d.id, ...d.data()}));
+    state.maizePurchases = purchasesSnap.docs.map(d=>({id:d.id, ...d.data()}));
+    state.maizeDispatches = dispatchesSnap.docs.map(d=>({id:d.id, ...d.data()}));
+    state.personnel = personnelSnap.docs.map(d=>({id:d.id, ...d.data()}));
+    state.laborPayments = paymentsSnap.docs.map(d=>({id:d.id, ...d.data()}));
+  } catch(e){
+    console.error(e);
+    toast('Failed to fetch data: ' + e.message, 'error');
+  } finally {
+    state.loading = false;
+  }
+}
+
+/* ------------------------------ Computations ----------------------------- */
+function computeStockBalances(){
+  return state.stockItems.map(item=>{
+    let balance=0, totalReceipts=0, totalIssues=0, totalDamages=0;
+    state.stockTransactions.filter(tx=>tx.stockItemId===item.id).forEach(tx=>{
+      if (tx.type==='RECEIPT'){ balance+=tx.quantity; totalReceipts+=tx.quantity; }
+      else if (tx.type==='ISSUE'){ balance-=tx.quantity; totalIssues+=tx.quantity; }
+      else if (tx.type==='DAMAGE'){ balance-=tx.quantity; totalDamages+=tx.quantity; }
+    });
+    return { stockItemId:item.id, stockItemName:item.name, unit:item.unit, balance, totalReceipts, totalIssues, totalDamages };
+  });
+}
+
+function computeMaizeBalance(){
+  const totalPurchasedKg = state.maizePurchases.reduce((s,p)=>s+p.quantityKg,0);
+  const totalDispatchedKg = state.maizeDispatches.reduce((s,d)=>s+d.quantityKg,0);
+  const totalPurchaseCost = state.maizePurchases.reduce((s,p)=>s+p.totalCost,0);
+  return { totalPurchasedKg, totalDispatchedKg, balanceKg: totalPurchasedKg-totalDispatchedKg, totalPurchaseCost };
+}
+
+function laborPaymentsThisMonth(){
+  const now = new Date();
+  return state.laborPayments.filter(p=>{
+    const d = new Date(p.date);
+    return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+  }).reduce((s,p)=>s+p.amount,0);
+}
+
+function personnelName(id){ const p = state.personnel.find(x=>x.id===id); return p ? p.name : 'Unknown'; }
+function personnelById(id){ return state.personnel.find(x=>x.id===id); }
+function stockItemName(id){ const s = state.stockItems.find(x=>x.id===id); return s ? s.name : 'Unknown'; }
+function stockItemUnit(id){ const s = state.stockItems.find(x=>x.id===id); return s ? s.unit : ''; }
+
+/* -------------------------------- Render -------------------------------- */
+function render(){
+  const root = document.getElementById('root');
+  if (!state.user){
+    root.innerHTML = renderLogin();
+    attachLoginEvents();
+    return;
+  }
+  root.innerHTML = renderApp();
+  attachAppEvents();
+  renderPageContent();
+}
+
+function renderLogin(){
+  return `
+  <div class="min-h-screen flex items-center justify-center p-4" style="background:linear-gradient(135deg,#fffbeb,#ffffff,#ecfdf5);">
+    <div class="card w-full max-w-md p-8">
+      <div class="text-center mb-2">
+        <div class="mx-auto w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mb-4 text-emerald-700">${iconWheat()}</div>
+        <h1 class="text-2xl font-bold text-emerald-900">Satellite Depot</h1>
+        <p class="text-sm text-gray-500 mt-1">Stock Management System</p>
+      </div>
+      <form id="login-form" class="space-y-4 mt-6">
+        <div>
+          <label class="label">Username</label>
+          <input class="input" id="login-username" placeholder="Enter your username" required autocomplete="username">
+        </div>
+        <div>
+          <label class="label">Password</label>
+          <input class="input" id="login-password" type="password" placeholder="Enter your password" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="login-btn" class="btn btn-primary w-full py-2.5">Sign In</button><p class="text-xs text-amber-700 mt-2">If login does not open the dashboard, first replace the placeholder Firebase config in the file with your real project keys.</p>
+      </form>
+      <div class="mt-6 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 space-y-1">
+        <p class="font-semibold text-gray-700">Demo Credentials:</p>
+        <p>Manager: <span class="font-mono">manager / manager123</span></p>
+        <p>SDC Clerk: <span class="font-mono">sdc1 / sdc123</span></p>
+        <button id="seed-btn" class="btn btn-outline w-full mt-2 text-xs py-1.5">Seed Demo Data (first run only)</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function attachLoginEvents(){
+  document.getElementById('login-form').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const btn = document.getElementById('login-btn');
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    btn.disabled = true; btn.textContent = 'Signing in...';
+    try{
+      const user = await login(username, password);
+      toast(`Welcome, ${user.name}!`);
+      await fetchAllData();
+      render();
+    } catch(err){
+      toast(err.message || 'Login failed', 'error');
+      btn.disabled = false; btn.textContent = 'Sign In';
+    }
+  });
+  document.getElementById('seed-btn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('seed-btn');
+    btn.disabled = true; btn.textContent = 'Seeding...';
+    try{ await seedDemoData(); } catch(err){ toast(err.message,'error'); }
+    btn.disabled = false; btn.textContent = 'Seed Demo Data (first run only)';
+  });
+}
+
+function renderApp(){
+  const items = NAV_ITEMS.filter(i => !i.managerOnly || state.user.role === 'MANAGER');
+  const initials = state.user.name.split(' ').map(n=>n[0]).join('').slice(0,2);
+  return `
+  ${state.sidebarOpen ? `<div id="sidebar-overlay" class="fixed inset-0 bg-black/40 z-40 lg:hidden"></div>` : ''}
+  <aside id="sidebar" class="fixed top-0 left-0 z-50 h-full w-64 bg-white border-r flex flex-col ${state.sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0">
+    <div class="flex items-center gap-3 px-4 py-4 border-b">
+      <div class="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center shrink-0 text-emerald-700">${iconWheat()}</div>
+      <div class="flex-1 min-w-0">
+        <h1 class="text-sm font-bold text-emerald-900 truncate">Satellite Depot</h1>
+        <p class="text-xs text-gray-500">Stock Management</p>
+      </div>
+      <button id="sidebar-close" class="lg:hidden text-gray-500">${iconX()}</button>
+    </div>
+    <nav class="flex-1 overflow-y-auto py-3 px-3 space-y-1">
+      ${items.map(i => `<div class="nav-item ${state.page===i.page?'active':''}" data-page="${i.page}">${i.icon}${i.label}</div>`).join('')}
+    </nav>
+    <div class="p-3 border-t">
+      <div class="flex items-center gap-3 px-2 py-2 rounded-lg bg-gray-50 mb-2">
+        <div class="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center text-xs font-bold shrink-0">${esc(initials)}</div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium truncate">${esc(state.user.name)}</p>
+          <p class="text-xs text-gray-500">${esc(state.user.role)}</p>
+        </div>
+      </div>
+      <button id="logout-btn" class="nav-item w-full text-red-500 hover:text-red-600">${iconLogout()}Sign Out</button>
+    </div>
+  </aside>
+  <button id="sidebar-open" class="fixed top-3 left-3 z-30 lg:hidden h-9 w-9 bg-white shadow-md border rounded-lg flex items-center justify-center">${iconMenu()}</button>
+  <main class="lg:ml-64 min-h-screen">
+    <div class="p-4 sm:p-6 lg:p-8 pt-14 lg:pt-6" id="page-content"></div>
+  </main>
+  <div id="modal-root"></div>
+  `;
+}
+
+function attachAppEvents(){
+  document.querySelectorAll('.nav-item[data-page]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      state.page = el.dataset.page;
+      state.sidebarOpen = false;
+      render();
+    });
+  });
+  document.getElementById('logout-btn').addEventListener('click', logout);
+  const openBtn = document.getElementById('sidebar-open');
+  if (openBtn) openBtn.addEventListener('click', ()=>{ state.sidebarOpen = true; render(); });
+  const closeBtn = document.getElementById('sidebar-close');
+  if (closeBtn) closeBtn.addEventListener('click', ()=>{ state.sidebarOpen = false; render(); });
+  const overlay = document.getElementById('sidebar-overlay');
+  if (overlay) overlay.addEventListener('click', ()=>{ state.sidebarOpen = false; render(); });
+}
+
+async function renderPageContent(){
+  const el = document.getElementById('page-content');
+  el.innerHTML = `<div class="space-y-4">${Array.from({length:4}).map(()=>'<div class="skeleton h-28"></div>').join('')}</div>`;
+  await fetchAllData();
+  const el2 = document.getElementById('page-content');
+  if (!el2) return; // page may have changed while awaiting
+  switch(state.page){
+    case 'dashboard': el2.innerHTML = renderDashboard(); attachDashboardEvents(); break;
+    case 'stock-movement': el2.innerHTML = renderStockMovement(); attachStockMovementEvents(); break;
+    case 'maize-purchases': el2.innerHTML = renderMaizePurchases(); attachMaizePurchasesEvents(); break;
+    case 'maize-dispatches': el2.innerHTML = renderMaizeDispatches(); attachMaizeDispatchesEvents(); break;
+    case 'personnel': el2.innerHTML = renderPersonnel(); attachPersonnelEvents(); break;
+    case 'labor-payments': el2.innerHTML = renderLaborPayments(); attachLaborPaymentsEvents(); break;
+    case 'reports': el2.innerHTML = renderReports(); attachReportsEvents(); break;
+    default: el2.innerHTML = renderDashboard(); attachDashboardEvents();
+  }
+}
+
+async function refreshCurrentPage(){
+  await fetchAllData();
+  renderPageAfterFetch();
+}
+function renderPageAfterFetch(){
+  const el = document.getElementById('page-content');
+  if (!el) return;
+  switch(state.page){
+    case 'dashboard': el.innerHTML = renderDashboard(); attachDashboardEvents(); break;
+    case 'stock-movement': el.innerHTML = renderStockMovement(); attachStockMovementEvents(); break;
+    case 'maize-purchases': el.innerHTML = renderMaizePurchases(); attachMaizePurchasesEvents(); break;
+    case 'maize-dispatches': el.innerHTML = renderMaizeDispatches(); attachMaizeDispatchesEvents(); break;
+    case 'personnel': el.innerHTML = renderPersonnel(); attachPersonnelEvents(); break;
+    case 'labor-payments': el.innerHTML = renderLaborPayments(); attachLaborPaymentsEvents(); break;
+    case 'reports': el.innerHTML = renderReports(); attachReportsEvents(); break;
+  }
+}
+
+/* ============================== DASHBOARD ============================== */
+function kpiCard(title, value, subtitle, colorClass, icon){
+  return `<div class="card p-4">
+    <div class="flex items-start justify-between">
+      <div class="space-y-1">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">${esc(title)}</p>
+        <p class="text-2xl font-bold">${value}</p>
+        <p class="text-xs text-gray-500 leading-relaxed">${subtitle}</p>
+      </div>
+      <div class="w-10 h-10 rounded-lg flex items-center justify-center ${colorClass} shrink-0">${icon}</div>
+    </div>
+  </div>`;
+}
+
+function renderDashboard(){
+  const stockBalances = computeStockBalances();
+  const maizeBalance = computeMaizeBalance();
+  const recentTx = state.stockTransactions.slice(0,10);
+  const recentDispatches = state.maizeDispatches.slice(0,10);
+  const activePersonnel = state.personnel.filter(p=>p.isActive);
+  const laborThisMonth = laborPaymentsThisMonth();
+
+  return `
+  <div class="space-y-6">
+    <div>
+      <h2 class="text-2xl font-bold">Dashboard</h2>
+      <p class="text-sm text-gray-500">Overview of stock balances, maize movement, and depot operations</p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      ${kpiCard('Maize Balance', fmtNum(maizeBalance.balanceKg)+' kg', `Purchased: ${fmtNum(maizeBalance.totalPurchasedKg)} kg | Cost: ZMW ${fmtNum(maizeBalance.totalPurchaseCost)}`, 'bg-emerald-100 text-emerald-600', iconWheat())}
+      ${kpiCard('Total Stock Items', stockBalances.length, `${stockBalances.filter(s=>s.balance>0).length} items with stock`, 'bg-amber-100 text-amber-600', iconCart())}
+      ${state.user.role==='MANAGER' ? kpiCard('Active Personnel', activePersonnel.length, `Labor cost this month: ZMW ${fmtNum(laborThisMonth)}`, 'bg-sky-100 text-sky-600', iconUsers()) : ''}
+      ${kpiCard('Maize Dispatched', fmtNum(maizeBalance.totalDispatchedKg)+' kg', 'To Main Depot', 'bg-rose-100 text-rose-600', iconTruck())}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="card p-4">
+        <h3 class="text-base font-semibold mb-2">Individual Stock Balances</h3>
+        <div style="height:280px;"><canvas id="chart-balances"></canvas></div>
+      </div>
+      <div class="card p-4">
+        <h3 class="text-base font-semibold mb-2">Stock Movement Summary</h3>
+        <div style="height:280px;"><canvas id="chart-movement"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card p-4">
+      <h3 class="text-base font-semibold mb-3">Stock Balance Detail (Balance b/f + Receipts - Issues - Damages = Balance)</h3>
+      <div class="overflow-x-auto">
+        <table class="datatable">
+          <thead><tr><th>Stock Item</th><th class="text-right">Unit</th><th class="text-right text-emerald-600">Receipts</th><th class="text-right text-rose-600">Issues</th><th class="text-right text-amber-600">Damages</th><th class="text-right">Balance</th></tr></thead>
+          <tbody>
+            ${stockBalances.map(sb=>`<tr>
+              <td class="font-medium">${esc(sb.stockItemName)}</td>
+              <td class="text-right text-gray-500">${esc(sb.unit)}</td>
+              <td class="text-right text-emerald-700">${fmtNum(sb.totalReceipts)}</td>
+              <td class="text-right text-rose-700">${fmtNum(sb.totalIssues)}</td>
+              <td class="text-right text-amber-700">${fmtNum(sb.totalDamages)}</td>
+              <td class="text-right font-bold ${sb.balance<0?'text-red-600':''}">${fmtNum(sb.balance)}</td>
+            </tr>`).join('') || '<tr><td colspan="6" class="text-center py-6 text-gray-400">No stock items yet</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card p-4">
+      <h3 class="text-base font-semibold mb-3">Maize Purchase Movement</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="rounded-lg bg-emerald-50 p-4 text-center">
+          <p class="text-xs text-gray-500 mb-1">Total Purchased</p>
+          <p class="text-xl font-bold text-emerald-800">${fmtNum(maizeBalance.totalPurchasedKg)} kg</p>
+        </div>
+        <div class="rounded-lg bg-rose-50 p-4 text-center">
+          <p class="text-xs text-gray-500 mb-1">Total Dispatched</p>
+          <p class="text-xl font-bold text-rose-800">${fmtNum(maizeBalance.totalDispatchedKg)} kg</p>
+        </div>
+        <div class="rounded-lg bg-amber-50 p-4 text-center">
+          <p class="text-xs text-gray-500 mb-1">Current Balance</p>
+          <p class="text-xl font-bold text-amber-800">${fmtNum(maizeBalance.balanceKg)} kg</p>
+          <p class="text-xs text-gray-500 mt-1">Total Cost: ZMW ${fmtNum(maizeBalance.totalPurchaseCost)}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="card p-4">
+        <h3 class="text-base font-semibold mb-2">Recent Stock Transactions</h3>
+        <div class="space-y-1 max-h-72 overflow-y-auto">
+          ${recentTx.length===0 ? '<p class="text-sm text-gray-400 py-4 text-center">No transactions yet</p>' : recentTx.map(tx=>`
+            <div class="flex items-center justify-between py-1.5 border-b last:border-0">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="badge ${tx.type==='RECEIPT'?'bg-emerald-100 text-emerald-800':tx.type==='DAMAGE'?'bg-amber-100 text-amber-800':'bg-rose-100 text-rose-800'}">${tx.type}</span>
+                <span class="text-sm truncate">${esc(stockItemName(tx.stockItemId))}</span>
+              </div>
+              <div class="text-right shrink-0 ml-2">
+                <p class="text-sm font-medium">${fmtNum(tx.quantity)} ${esc(stockItemUnit(tx.stockItemId))}</p>
+                <p class="text-xs text-gray-400">${fmtDate(tx.date)}</p>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="card p-4">
+        <h3 class="text-base font-semibold mb-2">Recent Maize Dispatches</h3>
+        <div class="space-y-1 max-h-72 overflow-y-auto">
+          ${recentDispatches.length===0 ? '<p class="text-sm text-gray-400 py-4 text-center">No dispatches yet</p>' : recentDispatches.map(d=>`
+            <div class="flex items-center justify-between py-1.5 border-b last:border-0">
+              <div class="min-w-0">
+                <p class="text-sm font-medium">${esc(d.destination)}</p>
+                ${d.waybillNumber ? `<p class="text-xs text-gray-400">IDT/IPTN: ${esc(d.waybillNumber)}</p>` : ''}
+              </div>
+              <div class="text-right shrink-0 ml-2">
+                <p class="text-sm font-medium">${fmtNum(d.quantityKg)} kg</p>
+                <p class="text-xs text-gray-400">${fmtDate(d.date)}</p>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function attachDashboardEvents(){
+  const stockBalances = computeStockBalances();
+  if (state.charts.balances) state.charts.balances.destroy();
+  if (state.charts.movement) state.charts.movement.destroy();
+
+  const ctx1 = document.getElementById('chart-balances');
+  if (ctx1){
+    state.charts.balances = new Chart(ctx1, {
+      type: 'bar',
+      data: {
+        labels: stockBalances.map(s=>s.stockItemName),
+        datasets: [{ label:'Balance', data: stockBalances.map(s=>s.balance), backgroundColor:'#16a34a', borderRadius:4 }]
+      },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{ font:{size:11} } }, y:{ beginAtZero:true } } }
+    });
+  }
+
+  const totalReceipts = stockBalances.reduce((s,b)=>s+b.totalReceipts,0);
+  const totalIssues = stockBalances.reduce((s,b)=>s+b.totalIssues,0);
+  const totalDamages = stockBalances.reduce((s,b)=>s+b.totalDamages,0);
+  const ctx2 = document.getElementById('chart-movement');
+  if (ctx2){
+    const labels=[], data=[], colors=[];
+    if (totalReceipts>0){ labels.push('Receipts'); data.push(totalReceipts); colors.push('#16a34a'); }
+    if (totalIssues>0){ labels.push('Issues'); data.push(totalIssues); colors.push('#dc2626'); }
+    if (totalDamages>0){ labels.push('Damages'); data.push(totalDamages); colors.push('#f59e0b'); }
+    state.charts.movement = new Chart(ctx2, {
+      type: 'doughnut',
+      data: { labels, datasets:[{ data, backgroundColor: colors }] },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
+    });
+  }
+}
+
+/* ============================ STOCK MOVEMENT ============================ */
+let stockFilterItem = 'all', stockFilterType = 'all';
+
+function renderStockMovement(){
+  const stockBalances = computeStockBalances();
+  const filtered = state.stockTransactions.filter(tx=>{
+    if (stockFilterItem!=='all' && tx.stockItemId!==stockFilterItem) return false;
+    if (stockFilterType!=='all' && tx.type!==stockFilterType) return false;
+    return true;
+  });
+  return `
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <h2 class="text-2xl font-bold">Stock Movement</h2>
+        <p class="text-sm text-gray-500">Balance b/f + Receipts - Issues - Damages = Balance as at today</p>
+      </div>
+      <div class="flex gap-2">
+        <button id="refresh-btn" class="btn btn-outline">${iconRefresh()} Refresh</button>
+        <button id="new-movement-btn" class="btn btn-primary">${iconPlus()} Record Movement</button>
+        <button id="add-stock-item-btn" class="btn btn-outline">Add Item</button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      ${stockBalances.map(item=>`
+        <div class="card p-3">
+          <p class="text-xs text-gray-500 font-medium truncate">${esc(item.stockItemName)}</p>
+          <p class="text-lg font-bold mt-1">${fmtNum(item.balance)} <span class="text-xs text-gray-400 font-normal">${esc(item.unit)}</span></p>
+          <div class="flex gap-2 mt-1 text-xs">
+            <span class="text-emerald-600">+${fmtNum(item.totalReceipts)}</span>
+            <span class="text-rose-600">-${fmtNum(item.totalIssues + item.totalDamages)}</span>
+          </div>
+        </div>`).join('') || '<p class="text-sm text-gray-400 col-span-full">No stock items yet - seed demo data or add items directly in Firestore.</p>'}
+    </div>
+
+    <div class="card p-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+        <h3 class="text-base font-semibold">Transaction History</h3>
+        <div class="flex gap-2">
+          <select id="filter-item" class="input text-xs" style="width:auto;">
+            <option value="all">All Items</option>
+            ${state.stockItems.map(i=>`<option value="${i.id}" ${stockFilterItem===i.id?'selected':''}>${esc(i.name)}</option>`).join('')}
+          </select>
+          <select id="filter-type" class="input text-xs" style="width:auto;">
+            <option value="all">All Types</option>
+            <option value="RECEIPT" ${stockFilterType==='RECEIPT'?'selected':''}>Receipts</option>
+            <option value="ISSUE" ${stockFilterType==='ISSUE'?'selected':''}>Issues</option>
+            <option value="DAMAGE" ${stockFilterType==='DAMAGE'?'selected':''}>Damages</option>
+          </select>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="datatable">
+          <thead><tr><th>Date</th><th>Item</th><th>Type</th><th class="text-right">Qty</th><th>Reference</th><th>By</th><th>Notes</th></tr></thead>
+          <tbody>
+            ${filtered.length===0 ? '<tr><td colspan="8" class="text-center py-8 text-gray-400">No transactions found</td></tr>' : filtered.map(tx=>`
+              <tr>
+                <td class="text-xs">${fmtDate(tx.date)}</td>
+                <td class="font-medium">${esc(stockItemName(tx.stockItemId))}</td>
+                <td><span class="badge ${tx.type==='RECEIPT'?'bg-emerald-100 text-emerald-800':tx.type==='DAMAGE'?'bg-amber-100 text-amber-800':'bg-rose-100 text-rose-800'}">${tx.type}</span></td>
+                <td class="text-right font-semibold ${tx.type==='RECEIPT'?'text-emerald-700':'text-rose-700'}">${tx.type==='RECEIPT'?'+':'-'}${fmtNum(tx.quantity)}</td>
+                <td class="text-xs text-gray-500">${esc(tx.reference)||'-'}</td>
+                <td class="text-xs">${esc(tx.createdByName)||'-'}</td>
+                <td class="text-xs text-gray-500 max-w-[8rem] truncate">${esc(tx.notes)||'-'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function stockMovementModal(){
+  return `
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold mb-1">Record Stock Movement</h3>
+      <p class="text-sm text-gray-500 mb-4">Enter the details of the stock receipt, issue, or damage.</p>
+      <form id="movement-form" class="space-y-4">
+        <div>
+          <label class="label">Stock Item *</label>
+          <select class="input" id="m-item" required>
+            <option value="">Select item</option>
+            ${state.stockItems.map(i=>{
+              const bal = computeStockBalances().find(b=>b.stockItemId===i.id);
+              return `<option value="${i.id}">${esc(i.name)} (Bal: ${bal?bal.balance:0} ${esc(i.unit)})</option>`;
+            }).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="label">Movement Type *</label>
+          <select class="input" id="m-type" required>
+            <option value="RECEIPT">Receipt (from Main Depot)</option>
+            <option value="ISSUE">Issue (to field/operations)</option>
+            <option value="DAMAGE">Damage/Loss</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="label">Quantity *</label><input class="input" type="number" min="1" id="m-qty" required></div>
+          <div><label class="label">Date *</label><input class="input" type="date" id="m-date" value="${todayStr()}" required></div>
+        </div>
+        <div><label class="label">Reference (GRN/Dispatch #)</label><input class="input" id="m-ref" placeholder="e.g. GRN-001"></div>
+        <div><label class="label">Notes</label><textarea class="input" id="m-notes" rows="2" placeholder="Optional notes..."></textarea></div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-submit">Save Movement</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
+
+function addStockItemModal(){
+  return `
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold mb-1">Add Stock Item</h3>
+      <p class="text-sm text-gray-500 mb-4">Create a new stock item to use in stock movement records.</p>
+      <form id="stock-item-form" class="space-y-4">
+        <div><label class="label">Item Name *</label><input class="input" id="si-name" required placeholder="e.g. Tarpaulin"></div>
+        <div><label class="label">Unit *</label><input class="input" id="si-unit" required placeholder="e.g. pcs, rolls, bags"></div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-submit">Save Item</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
+function attachStockMovementEvents(){
+  document.getElementById('refresh-btn').addEventListener('click', refreshCurrentPage);
+  const addBtn = document.getElementById('add-stock-item-btn');
+  if (addBtn) addBtn.addEventListener('click', ()=>{
+    document.getElementById('modal-root').innerHTML = addStockItemModal();
+    bindModalClose();
+    document.getElementById('stock-item-form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const name = document.getElementById('si-name').value.trim();
+      const unit = document.getElementById('si-unit').value.trim();
+      if (!name || !unit){ toast('Please fill all required fields','error'); return; }
+      const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
+      try{
+        await db.collection('stockItems').add({ name, unit });
+        toast(`Stock item "${name}" added successfully`);
+        closeModal();
+        await refreshCurrentPage();
+      } catch(err){ toast('Failed to add item: '+err.message,'error'); btn.disabled=false; btn.textContent='Save Item'; }
+    });
+  });
+
+  document.getElementById('new-movement-btn').addEventListener('click', ()=>{
+    document.getElementById('modal-root').innerHTML = stockMovementModal();
+    bindModalClose();
+    document.getElementById('movement-form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const stockItemId = document.getElementById('m-item').value;
+      const type = document.getElementById('m-type').value;
+      const quantity = Number(document.getElementById('m-qty').value);
+      if (!stockItemId || !quantity || quantity<=0){ toast('Please fill all required fields','error'); return; }
+      const btn = document.getElementById('modal-submit');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try{
+        await db.collection('stockTransactions').add({
+          stockItemId, type, quantity,
+          reference: document.getElementById('m-ref').value || null,
+          notes: document.getElementById('m-notes').value || null,
+          date: document.getElementById('m-date').value,
+          createdById: state.user.id,
+          createdByName: state.user.name,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        toast(`${type} of ${quantity} units recorded successfully`);
+        closeModal();
+        await refreshCurrentPage();
+      } catch(err){ toast('Failed to record transaction: '+err.message,'error'); btn.disabled=false; btn.textContent='Save Movement'; }
+    });
+  });
+  const fi = document.getElementById('filter-item'); if (fi) fi.addEventListener('change', e=>{ stockFilterItem=e.target.value; renderPageAfterFetch(); });
+  const ft = document.getElementById('filter-type'); if (ft) ft.addEventListener('change', e=>{ stockFilterType=e.target.value; renderPageAfterFetch(); });
+}
+
+function bindModalClose(){
+  const overlay = document.getElementById('modal-overlay');
+  overlay.addEventListener('click', (e)=>{ if (e.target===overlay) closeModal(); });
+  const cancel = document.getElementById('modal-cancel');
+  if (cancel) cancel.addEventListener('click', closeModal);
+}
+function closeModal(){ document.getElementById('modal-root').innerHTML = ''; }
+
+/* ============================ MAIZE PURCHASES ============================ */
+function renderMaizePurchases(){
+  const grandTotal = state.maizePurchases.reduce((s,p)=>s+p.quantityKg,0);
+  const grandCost = state.maizePurchases.reduce((s,p)=>s+p.totalCost,0);
+  return `
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div><h2 class="text-2xl font-bold">Maize Purchases</h2><p class="text-sm text-gray-500">Record maize purchases for the day</p></div>
+      <div class="flex gap-2">
+        <button id="refresh-btn" class="btn btn-outline">${iconRefresh()} Refresh</button>
+        <button id="new-purchase-btn" class="btn btn-primary">${iconPlus()} New Purchase</button>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Total Purchased</p><p class="text-2xl font-bold mt-1">${fmtNum(grandTotal)} kg</p></div>
+      <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Total Investment</p><p class="text-2xl font-bold mt-1">ZMW ${fmtNum(grandCost)}</p></div>
+    </div>
+    <div class="card p-4">
+      <h3 class="text-base font-semibold mb-3">Purchase Records</h3>
+      <div class="overflow-x-auto">
+        <table class="datatable">
+          <thead><tr><th>Date</th><th>Last PRCN # for the day</th><th class="text-right">Cumulative purchase figure for the day</th><th class="text-right">Price/kg</th><th class="text-right">Total</th><th>GRN</th><th>By</th></tr></thead>
+          <tbody>
+            ${state.maizePurchases.length===0 ? '<tr><td colspan="7" class="text-center py-8 text-gray-400">No purchases recorded yet</td></tr>' : state.maizePurchases.map(p=>`
+              <tr>
+                <td class="text-xs">${fmtDate(p.date)}</td>
+                <td class="font-medium">${esc(p.supplier)}</td>
+                <td class="text-right font-semibold">${fmtNum(p.quantityKg)}</td>
+                <td class="text-right text-gray-500">${Number(p.pricePerKg).toFixed(2)}</td>
+                <td class="text-right font-semibold">ZMW ${fmtNum(p.totalCost)}</td>
+                <td class="text-xs">${p.grnNumber ? `<span class="badge border border-gray-300 text-gray-700">${esc(p.grnNumber)}</span>` : '-'}</td>
+                <td class="text-xs">${esc(p.createdByName)||'-'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function maizePurchaseModal(){
+  return `
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold mb-1">Record Maize Purchase</h3>
+      <p class="text-sm text-gray-500 mb-4">Enter details of the maize purchase transaction.</p>
+      <form id="purchase-form" class="space-y-4">
+        <div><label class="label">Last PRCN # for the day *</label><input class="input" id="p-supplier" placeholder="Enter last PRCN # for the day" required></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="label">Cumulative purchase figure for the day *</label><input class="input" type="number" min="0" step="0.1" id="p-qty" required></div>
+          <div><label class="label">Price per kg (ZMW) *</label><input class="input" type="number" min="0" step="0.01" id="p-price" required></div>
+        </div>
+        <div class="rounded-lg bg-gray-50 p-3 flex justify-between text-sm">
+          <span class="text-gray-500">Total Cost:</span>
+          <span class="font-bold" id="p-total">ZMW 0</span>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="label">Date *</label><input class="input" type="date" id="p-date" value="${todayStr()}" required></div>
+          <div><label class="label">GRN Number</label><input class="input" id="p-grn" placeholder="GRN-XXX"></div>
+        </div>
+        <div><label class="label">Notes</label><textarea class="input" id="p-notes" rows="2" placeholder="Optional..."></textarea></div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-submit">Save Purchase</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
+function attachMaizePurchasesEvents(){
+  document.getElementById('refresh-btn').addEventListener('click', refreshCurrentPage);
+  document.getElementById('new-purchase-btn').addEventListener('click', ()=>{
+    document.getElementById('modal-root').innerHTML = maizePurchaseModal();
+    bindModalClose();
+    const qtyEl = document.getElementById('p-qty'), priceEl = document.getElementById('p-price'), totalEl = document.getElementById('p-total');
+    const updateTotal = ()=>{ totalEl.textContent = 'ZMW ' + ((Number(qtyEl.value)||0) * (Number(priceEl.value)||0)).toLocaleString(); };
+    qtyEl.addEventListener('input', updateTotal); priceEl.addEventListener('input', updateTotal);
+    document.getElementById('purchase-form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const supplier = document.getElementById('p-supplier').value.trim();
+      const quantityKg = Number(qtyEl.value);
+      const pricePerKg = Number(priceEl.value);
+      if (!supplier || !quantityKg || quantityKg<=0 || !pricePerKg){ toast('Please fill all required fields','error'); return; }
+      const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
+      try{
+        await db.collection('maizePurchases').add({
+          date: document.getElementById('p-date').value,
+          supplier, quantityKg, pricePerKg, totalCost: quantityKg*pricePerKg,
+          grnNumber: document.getElementById('p-grn').value || null,
+          notes: document.getElementById('p-notes').value || null,
+          createdById: state.user.id, createdByName: state.user.name,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        toast(`Purchase of ${quantityKg} kg from ${supplier} recorded`);
+        closeModal();
+        await refreshCurrentPage();
+      } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Save Purchase'; }
+    });
+  });
+}
+
+/* ============================ MAIZE DISPATCHES ============================ */
+function renderMaizeDispatches(){
+  const totalDispatched = state.maizeDispatches.reduce((s,d)=>s+d.quantityKg,0);
+  return `
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div><h2 class="text-2xl font-bold">Maize Dispatches</h2><p class="text-sm text-gray-500">Record maize dispatched from satellite depot to main depot</p></div>
+      <div class="flex gap-2">
+        <button id="refresh-btn" class="btn btn-outline">${iconRefresh()} Refresh</button>
+        <button id="new-dispatch-btn" class="btn btn-primary">${iconPlus()} New Dispatch</button>
+      </div>
+    </div>
+    <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Total Dispatched</p><p class="text-2xl font-bold mt-1">${fmtNum(totalDispatched)} kg</p></div>
+    <div class="card p-4">
+      <h3 class="text-base font-semibold mb-3">Dispatch Records</h3>
+      <div class="overflow-x-auto">
+        <table class="datatable">
+          <thead><tr><th>Date</th><th class="text-right">Qty (kg)</th><th>Destination</th><th>Vehicle</th><th>Driver</th><th>IDT/IPTN Number</th><th>By</th></tr></thead>
+          <tbody>
+            ${state.maizeDispatches.length===0 ? '<tr><td colspan="7" class="text-center py-8 text-gray-400">No dispatches recorded yet</td></tr>' : state.maizeDispatches.map(d=>`
+              <tr>
+                <td class="text-xs">${fmtDate(d.date)}</td>
+                <td class="text-right font-semibold">${fmtNum(d.quantityKg)}</td>
+                <td class="font-medium">${esc(d.destination)}</td>
+                <td class="text-xs">${esc(d.vehicleReg)||'-'}</td>
+                <td class="text-xs">${esc(d.driverName)||'-'}</td>
+                <td class="text-xs">${d.waybillNumber ? `<span class="badge border border-gray-300 text-gray-700">${esc(d.waybillNumber)}</span>`:'-'}</td>
+                <td class="text-xs">${esc(d.createdByName)||'-'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function maizeDispatchModal(){
+  return `
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold mb-1">Record Maize Dispatch</h3>
+      <p class="text-sm text-gray-500 mb-4">Enter details of maize being dispatched to the main depot.</p>
+      <form id="dispatch-form" class="space-y-4">
+        <div>
+          <label class="label">Link to Purchase (optional)</label>
+          <select class="input" id="d-purchase">
+            <option value="">None</option>
+            ${state.maizePurchases.map(p=>`<option value="${p.id}">${esc(p.supplier)} - ${p.quantityKg}kg (${fmtDate(p.date)})</option>`).join('')}
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="label">Cumulative purchase figure for the day *</label><input class="input" type="number" min="0" step="0.1" id="d-qty" required></div>
+          <div><label class="label">Date *</label><input class="input" type="date" id="d-date" value="${todayStr()}" required></div>
+        </div>
+        <div><label class="label">Destination</label><input class="input" id="d-dest" value="Main Depot"></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="label">Vehicle Reg</label><input class="input" id="d-vehicle" placeholder="e.g. AB 1234"></div>
+          <div><label class="label">Driver Name</label><input class="input" id="d-driver" placeholder="Driver name"></div>
+        </div>
+        <div><label class="label">IDT/IPTN Number</label><input class="input" id="d-waybill" placeholder="Enter IDT/IPTN number"></div>
+        <div><label class="label">Notes</label><textarea class="input" id="d-notes" rows="2" placeholder="Optional..."></textarea></div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-submit">Save Dispatch</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
+function attachMaizeDispatchesEvents(){
+  document.getElementById('refresh-btn').addEventListener('click', refreshCurrentPage);
+  document.getElementById('new-dispatch-btn').addEventListener('click', ()=>{
+    document.getElementById('modal-root').innerHTML = maizeDispatchModal();
+    bindModalClose();
+    document.getElementById('dispatch-form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const quantityKg = Number(document.getElementById('d-qty').value);
+      if (!quantityKg || quantityKg<=0){ toast('Please enter a valid quantity','error'); return; }
+      const destination = document.getElementById('d-dest').value || 'Main Depot';
+      const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
+      try{
+        await db.collection('maizeDispatches').add({
+          purchaseId: document.getElementById('d-purchase').value || null,
+          date: document.getElementById('d-date').value,
+          quantityKg, destination,
+          vehicleReg: document.getElementById('d-vehicle').value || null,
+          driverName: document.getElementById('d-driver').value || null,
+          waybillNumber: document.getElementById('d-waybill').value || null,
+          notes: document.getElementById('d-notes').value || null,
+          createdById: state.user.id, createdByName: state.user.name,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        toast(`Dispatch of ${quantityKg} kg to ${destination} recorded`);
+        closeModal();
+        await refreshCurrentPage();
+      } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Save Dispatch'; }
+    });
+  });
+}
+
+/* ================================ PERSONNEL ================================ */
+function roleBadgeColor(role){
+  return { SDC:'bg-emerald-100 text-emerald-800', GUARD:'bg-sky-100 text-sky-800', LOADER:'bg-amber-100 text-amber-800', STITCHER:'bg-purple-100 text-purple-800' }[role] || 'bg-gray-100 text-gray-800';
+}
+
+function renderPersonnel(){
+  return `
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div><h2 class="text-2xl font-bold">Personnel Management</h2><p class="text-sm text-gray-500">Manage SDCs, Guards, Loaders, and Stitchers (paid per bag handled)</p></div>
+      <div class="flex gap-2">
+        <button id="refresh-btn" class="btn btn-outline">${iconRefresh()} Refresh</button>
+        <button id="new-personnel-btn" class="btn btn-primary">${iconPlus()} Add Personnel</button>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      ${['SDC','GUARD','LOADER','STITCHER'].map(role=>{
+        const count = state.personnel.filter(p=>p.role===role && p.isActive).length;
+        const labelMap = { SDC:'SDC Clerks', GUARD:'Guards', LOADER:'Loaders', STITCHER:'Stitchers' };
+        return `<div class="card p-3 text-center"><p class="text-xs text-gray-500">${labelMap[role]}</p><p class="text-xl font-bold mt-1">${count}</p></div>`;
+      }).join('')}
+    </div>
+    <div class="card p-4">
+      <h3 class="text-base font-semibold mb-3">All Personnel</h3>
+      <div class="overflow-x-auto">
+        <table class="datatable">
+          <thead><tr><th>Name</th><th>Role</th><th>Payment</th><th class="text-right">Rate/Salary</th><th>Phone</th><th>Status</th><th class="text-right">Actions</th></tr></thead>
+          <tbody>
+            ${state.personnel.length===0 ? '<tr><td colspan="7" class="text-center py-8 text-gray-400">No personnel added yet</td></tr>' : state.personnel.map(p=>`
+              <tr class="${!p.isActive?'opacity-50':''}">
+                <td class="font-medium">${esc(p.name)}</td>
+                <td><span class="badge ${roleBadgeColor(p.role)}">${esc(p.role)}</span></td>
+                <td class="text-xs">${esc(p.paymentType)}</td>
+                <td class="text-right font-semibold">ZMW ${fmtNum(p.rateOrSalary)}</td>
+                <td class="text-xs">${esc(p.phone)||'-'}</td>
+                <td><span class="badge ${p.isActive?'bg-emerald-100 text-emerald-800':'bg-gray-100 text-gray-800'}">${p.isActive?'Active':'Inactive'}</span></td>
+                <td class="text-right"><button class="text-xs text-emerald-700 hover:underline toggle-active-btn" data-id="${p.id}" data-active="${p.isActive}">${p.isActive?'Deactivate':'Activate'}</button></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function personnelModal(){
+  return `
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold mb-1">Add Personnel</h3>
+      <p class="text-sm text-gray-500 mb-4">Add a new depot staff member or casual worker.</p>
+      <form id="personnel-form" class="space-y-4">
+        <div><label class="label">Full Name *</label><input class="input" id="per-name" placeholder="e.g. John Banda" required></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="label">Role *</label>
+            <select class="input" id="per-role" required>
+              <option value="">Select role</option>
+              <option value="SDC">SDC (Fixed Salary)</option>
+              <option value="GUARD">Guard (Fixed Salary)</option>
+              <option value="LOADER">Loader (Per bag handled)</option>
+              <option value="STITCHER">Stitcher (Per bag handled)</option>
+            </select>
+          </div>
+          <div>
+            <label class="label">Payment Type</label>
+            <select class="input" id="per-payment-type">
+              <option value="MONTHLY">Monthly Salary</option>
+              <option value="PER_BAG">Per Bag Rate</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="label" id="per-rate-label">Monthly Salary (ZMW) *</label><input class="input" type="number" min="0" step="0.01" id="per-rate" required></div>
+          <div><label class="label">Phone</label><input class="input" id="per-phone" placeholder="+260..."></div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-submit">Add Personnel</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
+function attachPersonnelEvents(){
+  document.getElementById('refresh-btn').addEventListener('click', refreshCurrentPage);
+  document.getElementById('new-personnel-btn').addEventListener('click', ()=>{
+    document.getElementById('modal-root').innerHTML = personnelModal();
+    bindModalClose();
+    const payType = document.getElementById('per-payment-type'), rateLabel = document.getElementById('per-rate-label');
+    payType.addEventListener('change', ()=>{ rateLabel.textContent = (payType.value==='MONTHLY'?'Monthly Salary (ZMW) *':'Rate per Bag (ZMW) *'); });
+    document.getElementById('personnel-form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const name = document.getElementById('per-name').value.trim();
+      const role = document.getElementById('per-role').value;
+      const rate = Number(document.getElementById('per-rate').value);
+      if (!name || !role || !rate){ toast('Please fill all required fields','error'); return; }
+      const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
+      try{
+        await db.collection('personnel').add({
+          name, role, rateOrSalary: rate,
+          paymentType: payType.value,
+          phone: document.getElementById('per-phone').value || null,
+          isActive: true,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        toast(`${name} added as ${role}`);
+        closeModal();
+        await refreshCurrentPage();
+      } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Add Personnel'; }
+    });
+  });
+  document.querySelectorAll('.toggle-active-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.dataset.id;
+      const wasActive = btn.dataset.active === 'true';
+      try{
+        await db.collection('personnel').doc(id).update({ isActive: !wasActive });
+        toast(`${personnelName(id)} ${wasActive?'deactivated':'activated'}`);
+        await refreshCurrentPage();
+      } catch(err){ toast('Failed to update: '+err.message,'error'); }
+    });
+  });
+}
+
+/* ============================ LABOR PAYMENTS ============================ */
+function renderLaborPayments(){
+  const totalPaid = state.laborPayments.reduce((s,p)=>s+p.amount,0);
+  const currentMonth = new Date().toLocaleString('en-US',{month:'long', year:'numeric'});
+  const now = new Date();
+  const thisMonthPayments = state.laborPayments.filter(p=>{ const d=new Date(p.date); return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear(); });
+  const thisMonthTotal = thisMonthPayments.reduce((s,p)=>s+p.amount,0);
+  return `
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div><h2 class="text-2xl font-bold">Labor Payments</h2><p class="text-sm text-gray-500">Record payments for monthly staff and bag-based casual labor</p></div>
+      <div class="flex gap-2">
+        <button id="refresh-btn" class="btn btn-outline">${iconRefresh()} Refresh</button>
+        <button id="new-payment-btn" class="btn btn-primary">${iconPlus()} Record Payment</button>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">This Month (${esc(currentMonth)})</p><p class="text-2xl font-bold mt-1">ZMW ${fmtNum(thisMonthTotal)}</p><p class="text-xs text-gray-400">${thisMonthPayments.length} payments</p></div>
+      <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">All-time Total</p><p class="text-2xl font-bold mt-1">ZMW ${fmtNum(totalPaid)}</p><p class="text-xs text-gray-400">${state.laborPayments.length} payments</p></div>
+    </div>
+    <div class="card p-4">
+      <h3 class="text-base font-semibold mb-3">Payment Records</h3>
+      <div class="overflow-x-auto">
+        <table class="datatable">
+          <thead><tr><th>Date</th><th>Personnel</th><th>Role</th><th class="text-right">Bags Handled</th><th class="text-right">Rate/Bag</th><th class="text-right">Amount</th><th>Period</th><th>By</th></tr></thead>
+          <tbody>
+            ${state.laborPayments.length===0 ? '<tr><td colspan="7" class="text-center py-8 text-gray-400">No payments recorded yet</td></tr>' : state.laborPayments.map(p=>{
+              const per = personnelById(p.personnelId);
+              return `<tr>
+                <td class="text-xs">${fmtDate(p.date)}</td>
+                <td class="font-medium">${esc(per?per.name:'Unknown')}</td>
+                <td><span class="badge border border-gray-300 text-gray-700">${esc(per?per.role:'-')}</span></td>
+                <td class="text-right">${p.bagsHandled ?? '-'}</td>
+                <td class="text-right">${p.rateApplied ? 'ZMW ' + fmtNum(p.rateApplied) : '-'}</td>
+                <td class="text-right font-semibold">ZMW ${fmtNum(p.amount)}</td>
+                <td class="text-xs">${esc(p.period)||'-'}</td>
+                <td class="text-xs">${esc(p.createdByName)||'-'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function laborPaymentModal(){
+  const activePersonnel = state.personnel.filter(p=>p.isActive);
+  const currentMonth = new Date().toLocaleString('en-US',{month:'long', year:'numeric'});
+  return `
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold mb-1">Record Labor Payment</h3>
+      <p class="text-sm text-gray-500 mb-4">Record a payment to depot staff or casual worker.</p>
+      <form id="payment-form" class="space-y-4">
+        <div>
+          <label class="label">Personnel *</label>
+          <select class="input" id="lp-personnel" required>
+            <option value="">Select personnel</option>
+            ${activePersonnel.map(p=>`<option value="${p.id}" data-payment-type="${p.paymentType}" data-rate="${p.rateOrSalary}">${esc(p.name)} (${esc(p.role)} - ${esc(p.paymentType)})</option>`).join('')}
+          </select>
+        </div>
+        <div id="lp-bag-row" class="grid grid-cols-2 gap-3 hidden">
+          <div><label class="label">Bags Handled</label><input class="input" type="number" min="0" step="1" id="lp-bags"></div>
+          <div><label class="label">Auto-calc Amount</label><div class="rounded-lg bg-gray-50 p-2.5 text-sm" id="lp-autocalc">0 ZMW</div></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="label">Amount (ZMW) *</label><input class="input" type="number" min="0" step="0.01" id="lp-amount" required></div>
+          <div><label class="label">Date *</label><input class="input" type="date" id="lp-date" value="${todayStr()}" required></div>
+        </div>
+        <div><label class="label">Period</label><input class="input" id="lp-period" placeholder="${esc(currentMonth)}"></div>
+        <div><label class="label">Notes</label><textarea class="input" id="lp-notes" rows="2" placeholder="Optional..."></textarea></div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-submit">Save Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
+function attachLaborPaymentsEvents(){
+  document.getElementById('refresh-btn').addEventListener('click', refreshCurrentPage);
+  document.getElementById('new-payment-btn').addEventListener('click', ()=>{
+    document.getElementById('modal-root').innerHTML = laborPaymentModal();
+    bindModalClose();
+    const personnelSelect = document.getElementById('lp-personnel');
+    const bagRow = document.getElementById('lp-bag-row');
+    const bagsInput = document.getElementById('lp-bags');
+    const autocalc = document.getElementById('lp-autocalc');
+    const amountInput = document.getElementById('lp-amount');
+    const updateBagCalc = ()=>{
+      const opt = personnelSelect.selectedOptions[0];
+      const isPerBag = opt && opt.dataset.paymentType === 'PER_BAG';
+      bagRow.classList.toggle('hidden', !isPerBag);
+      if (isPerBag){
+        const rate = Number(opt.dataset.rate)||0;
+        const amount = (Number(bagsInput.value)||0) * rate;
+        autocalc.textContent = amount.toLocaleString() + ' ZMW';
+        amountInput.value = amount || '';
+      } else {
+        autocalc.textContent = '0 ZMW';
+      }
+    };
+    personnelSelect.addEventListener('change', updateBagCalc);
+    bagsInput.addEventListener('input', updateBagCalc);
+    document.getElementById('payment-form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const personnelId = personnelSelect.value;
+      const amount = Number(document.getElementById('lp-amount').value);
+      if (!personnelId || !amount || amount<=0){ toast('Please fill all required fields','error'); return; }
+      const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
+      try{
+        await db.collection('laborPayments').add({
+          personnelId,
+          date: document.getElementById('lp-date').value,
+          bagsHandled: bagsInput.value ? Number(bagsInput.value) : null,
+          rateApplied: personnelById(personnelId)?.rateOrSalary || null,
+          amount,
+          period: document.getElementById('lp-period').value || null,
+          notes: document.getElementById('lp-notes').value || null,
+          createdById: state.user.id, createdByName: state.user.name,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        toast(`Payment of ZMW ${amount} recorded`);
+        closeModal();
+        await refreshCurrentPage();
+      } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Save Payment'; }
+    });
+  });
+}
+
+/* ================================ REPORTS ================================ */
+function generateReportText(){
+  const stockBalances = computeStockBalances();
+  const maizeBalance = computeMaizeBalance();
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+  let text = `*SATELLITE DEPOT STOCK REPORT*\n`;
+  text += `Date: ${dateStr}\n`;
+  text += `${'═'.repeat(35)}\n\n`;
+
+  text += `*MAIZE BALANCE*\n`;
+  text += `  Purchased: ${fmtNum(maizeBalance.totalPurchasedKg)} kg\n`;
+  text += `  Dispatched: ${fmtNum(maizeBalance.totalDispatchedKg)} kg\n`;
+  text += `  Balance: ${fmtNum(maizeBalance.balanceKg)} kg\n`;
+  text += `  Total Cost: ZMW ${fmtNum(maizeBalance.totalPurchaseCost)}\n\n`;
+
+  text += `*STOCK BALANCES (B/f + Receipts - Issues - Damages = Balance)*\n`;
+  text += `${'─'.repeat(45)}\n`;
+  for (const s of stockBalances){
+    text += `  ${s.stockItemName}:\n`;
+    text += `    Receipts: ${s.totalReceipts} | Issues: ${s.totalIssues} | Damages: ${s.totalDamages}\n`;
+    text += `    *Balance: ${s.balance} ${s.unit}*\n`;
+  }
+  text += `\n`;
+
+  text += `*RECENT STOCK TRANSACTIONS*\n`;
+  for (const tx of state.stockTransactions.slice(0,10)){
+    const sign = tx.type==='RECEIPT' ? '+' : '-';
+    text += `  ${fmtDate(tx.date)} | ${tx.type} | ${sign}${tx.quantity} ${stockItemUnit(tx.stockItemId)} | ${stockItemName(tx.stockItemId)}\n`;
+  }
+  text += `\n`;
+
+  if (state.maizePurchases.length>0){
+    text += `*RECENT MAIZE PURCHASES*\n`;
+    for (const p of state.maizePurchases.slice(0,5)){
+      text += `  ${fmtDate(p.date)} | ${fmtNum(p.quantityKg)}kg @ ZMW${p.pricePerKg}/kg | ${p.supplier}\n`;
+    }
+    text += `\n`;
+  }
+
+  if (state.maizeDispatches.length>0){
+    text += `*RECENT MAIZE DISPATCHES*\n`;
+    for (const dp of state.maizeDispatches.slice(0,5)){
+      text += `  ${fmtDate(dp.date)} | ${fmtNum(dp.quantityKg)}kg to ${dp.destination}`;
+      if (dp.waybillNumber) text += ` | WB: ${dp.waybillNumber}`;
+      text += `\n`;
+    }
+    text += `\n`;
+  }
+
+  text += `${'═'.repeat(35)}\n`;
+  text += `Generated by Satellite Depot Management System\n`;
+  return text;
+}
+
+function renderReports(){
+  const phone = state.user.phone || '+260XXXXXXXXX';
+  return `
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div><h2 class="text-2xl font-bold">Reports & WhatsApp</h2><p class="text-sm text-gray-500">Generate stock report and send to the manager via WhatsApp</p></div>
+      <button id="refresh-btn" class="btn btn-outline">${iconRefresh()} Refresh Data</button>
+    </div>
+    <div class="card p-4">
+      <h3 class="text-base font-semibold mb-1 flex items-center gap-2">Send Report</h3>
+      <p class="text-sm text-gray-500 mb-3">Generate the report and send it via WhatsApp or copy to clipboard</p>
+      <div class="flex flex-col sm:flex-row gap-3">
+        <div class="flex-1">
+          <label class="label">Manager's Phone Number</label>
+          <input class="input" id="report-phone" value="${esc(phone)}" placeholder="+260XXXXXXXXX">
+        </div>
+        <div class="flex items-end gap-2">
+          <button id="send-whatsapp-btn" class="btn" style="background:#16a34a;color:#fff;">${iconWhatsapp()} Send via WhatsApp</button>
+          <button id="copy-report-btn" class="btn btn-outline">${iconCopy()} Copy</button>
+        </div>
+      </div>
+    </div>
+    <div class="card p-4">
+      <h3 class="text-base font-semibold mb-3">Report Preview</h3>
+      <div class="bg-gray-50 rounded-lg p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap max-h-[500px] overflow-y-auto" id="report-preview"></div>
+    </div>
+  </div>`;
+}
+
+function attachReportsEvents(){
+  document.getElementById('refresh-btn').addEventListener('click', refreshCurrentPage);
+  document.getElementById('report-preview').textContent = generateReportText();
+  document.getElementById('send-whatsapp-btn').addEventListener('click', ()=>{
+    const phone = document.getElementById('report-phone').value.trim();
+    if (!phone){ toast('Please enter a phone number','error'); return; }
+    const cleanPhone = phone.replace(/[^0-9+]/g,'').replace('+','');
+    const encodedText = encodeURIComponent(generateReportText());
+    window.open(`https://wa.me/${cleanPhone}?text=${encodedText}`, '_blank');
+    toast('WhatsApp opened with report. Send the message to complete.');
+  });
+  document.getElementById('copy-report-btn').addEventListener('click', async ()=>{
+    try{
+      await navigator.clipboard.writeText(generateReportText());
+      toast('Report copied to clipboard');
+    } catch(err){ toast('Failed to copy','error'); }
+  });
+}
+
+/* ------------------------------- Bootstrap ------------------------------- */
+(async function init(){
+  if (!LIBS_OK || window.__depotLibFailed) return;
+  const saved = localStorage.getItem('depot-auth');
+  if (saved){
+    try{ state.user = JSON.parse(saved); await ensureAnonAuth(); } catch(e){ state.user = null; }
+  }
+  try{
+    render();
+  } catch(e){
+    console.error('Render error:', e);
+    document.getElementById('root').innerHTML = '<div style="padding:2rem;font-family:sans-serif;color:#991b1b;">Something went wrong while starting the app: ' + e.message + '</div>';
+  }
+})();
+</script>
+</body>
+</html>
