@@ -137,19 +137,29 @@ This typically indicates that your device does not have a healthy Internet conne
    rules_version = '2';
    service cloud.firestore {
      match /databases/{database}/documents {
+       match /users/{userId} {
+         allow read: if request.auth != null;
+         allow create: if request.auth != null
+                       && request.resource.data.role == 'SDC'
+                       && request.resource.data.keys().hasAll(['username','password','name','role'])
+                       && request.resource.data.username is string
+                       && request.resource.data.password is string
+                       && request.resource.data.name is string;
+         allow update, delete: if false;
+       }
        match /{document=**} {
          allow read, write: if request.auth != null;
        }
      }
    }
 
-   NOTE: Because login here is a simple username/password check against
-   a Firestore collection (not Firebase Auth's real user system), these
-   rules only require *some* signed-in (anonymous) session - they do not
-   verify who is logged into the app itself. This mirrors the original
-   app's simplicity (plaintext passwords, no server-side session) and is
-   fine for an internal single-depot tool, but should not be treated as
-   production-grade security for sensitive data.
+   NOTE: This still checks only that *some* anonymous session exists, not
+   which app-level user is acting (see caveat below) - but it now stops a
+   self-signed-up user from writing role:'MANAGER' into their own account,
+   and stops anyone from editing or deleting other users' accounts once
+   created. Promoting someone to MANAGER has to be done manually in the
+   Firebase Console (Firestore -> users -> edit the role field) since
+   client-side updates to /users are now blocked entirely.
    ========================================================================= */
 
 const FIREBASE_CONFIG = {
@@ -292,7 +302,7 @@ async function login(username, password){
   return user;
 }
 
-async function signup(username, password, name, role, phone){
+async function signup(username, password, name, phone){
   await ensureAnonAuth();
 
   if (!username || !password || !name) throw new Error('Please fill in all required fields.');
@@ -302,10 +312,10 @@ async function signup(username, password, name, role, phone){
   if (!existing.empty) throw new Error('That username is already taken. Please choose another.');
 
   const newUserRef = db.collection('users').doc();
-  const userData = { username, password, name, role, phone: phone || null };
+  const userData = { username, password, name, role: 'SDC', phone: phone || null };
   await newUserRef.set(userData);
 
-  const user = { id: newUserRef.id, username, name, role, phone: phone || null };
+  const user = { id: newUserRef.id, username, name, role: 'SDC', phone: phone || null };
   state.user = user;
   localStorage.setItem('depot-auth', JSON.stringify(user));
   return user;
@@ -495,16 +505,10 @@ function renderSignupForm(){
           <input class="input" id="signup-password" type="password" placeholder="At least 6 characters" required autocomplete="new-password" minlength="6">
         </div>
         <div>
-          <label class="label">Role</label>
-          <select class="input" id="signup-role" required>
-            <option value="SDC">SDC Clerk</option>
-            <option value="MANAGER">Depot Manager</option>
-          </select>
-        </div>
-        <div>
           <label class="label">Phone (optional)</label>
           <input class="input" id="signup-phone" placeholder="+260XXXXXXXXX" autocomplete="tel">
         </div>
+        <p class="text-xs text-gray-400">New accounts start as SDC Clerk. A manager can upgrade your role afterward if needed.</p>
         <button type="submit" id="signup-btn" class="btn btn-primary w-full py-2.5">Create Account</button>
       </form>`;
 }
@@ -538,11 +542,10 @@ function attachLoginEvents(){
       const name = document.getElementById('signup-name').value.trim();
       const username = document.getElementById('signup-username').value.trim();
       const password = document.getElementById('signup-password').value;
-      const role = document.getElementById('signup-role').value;
       const phone = document.getElementById('signup-phone').value.trim();
       btn.disabled = true; btn.textContent = 'Creating account...';
       try{
-        const user = await signup(username, password, name, role, phone);
+        const user = await signup(username, password, name, phone);
         toast(`Welcome, ${user.name}! Your account has been created.`);
         await startRealtimeSync();
         render();
