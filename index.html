@@ -114,14 +114,15 @@ This typically indicates that your device does not have a healthy Internet conne
    SETUP INSTRUCTIONS
    ---------------------------------------------------------------------
    1. Create a Firebase project at https://console.firebase.google.com
-   2. Enable "Firestore Database" (production mode is fine).
+   2. Enable "Realtime Database" (start in locked mode is fine).
    3. Enable "Authentication" -> Sign-in method -> Anonymous (this is used
-      only to satisfy Firestore's request.auth != null security rule -
-      actual login is username/password checked against the `users`
-      collection below, matching the original app's login screen).
-   4. Copy your web app config into FIREBASE_CONFIG below.
-   5. Paste the FIRESTORE SECURITY RULES (bottom of this comment block)
-      into Firestore -> Rules.
+      only to satisfy the RTDB rule requiring auth != null - actual login
+      is username/password checked against the `users` node below,
+      matching the original app's login screen).
+   4. Copy your web app config into FIREBASE_CONFIG below (databaseURL is
+      required for Realtime Database - find it on the RTDB "Data" tab).
+   5. Paste the RTDB SECURITY RULES (bottom of this comment block) into
+      Realtime Database -> Rules.
    6. Open this file in a browser (or host it on GitHub Pages). On first
       run, click "Seed Demo Data" on the login screen to create the demo
       users, stock items and personnel (same as the original seed route).
@@ -132,34 +133,75 @@ This typically indicates that your device does not have a healthy Internet conne
      SDC Clerk: sdc2 / sdc123
 
    ---------------------------------------------------------------------
-   FIRESTORE SECURITY RULES (copy into Firebase Console -> Firestore -> Rules)
+   REALTIME DATABASE SECURITY RULES (copy into Firebase Console -> Realtime
+   Database -> Rules)
    ---------------------------------------------------------------------
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       match /users/{userId} {
-         allow read: if request.auth != null;
-         allow create: if request.auth != null
-                       && request.resource.data.role == 'SDC'
-                       && request.resource.data.keys().hasAll(['username','password','name','role'])
-                       && request.resource.data.username is string
-                       && request.resource.data.password is string
-                       && request.resource.data.name is string;
-         allow update, delete: if false;
-       }
-       match /{document=**} {
-         allow read, write: if request.auth != null;
+   {
+     "rules": {
+       "users": {
+         ".read": "auth != null",
+         "$userId": {
+           ".write": "auth != null && !data.exists() && newData.hasChildren(['username','password','name','role']) && newData.child('username').isString() && newData.child('username').val().length > 0 && newData.child('password').isString() && newData.child('password').val().length >= 6 && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('role').val() == 'SDC'"
+         }
+       },
+       "stockItems": {
+         ".read": "auth != null",
+         "$id": {
+           ".write": "auth != null",
+           ".validate": "newData.hasChildren(['name','unit']) && newData.child('name').isString() && newData.child('unit').isString()"
+         }
+       },
+       "stockTransactions": {
+         ".read": "auth != null",
+         "$id": {
+           ".write": "auth != null",
+           ".validate": "newData.hasChildren(['stockItemId','type','quantity','date']) && newData.child('quantity').isNumber() && newData.child('quantity').val() > 0 && (newData.child('type').val() == 'RECEIPT' || newData.child('type').val() == 'ISSUE' || newData.child('type').val() == 'DAMAGE')"
+         }
+       },
+       "maizePurchases": {
+         ".read": "auth != null",
+         "$id": {
+           ".write": "auth != null",
+           ".validate": "newData.child('quantityKg').isNumber() && newData.child('quantityKg').val() > 0 && newData.child('totalCost').isNumber() && newData.child('totalCost').val() >= 0"
+         }
+       },
+       "maizeDispatches": {
+         ".read": "auth != null",
+         "$id": {
+           ".write": "auth != null",
+           ".validate": "newData.child('quantityKg').isNumber() && newData.child('quantityKg').val() > 0"
+         }
+       },
+       "personnel": {
+         ".read": "auth != null",
+         "$id": {
+           ".write": "auth != null",
+           ".validate": "newData.child('name').isString() && newData.child('rateOrSalary').isNumber() && newData.child('rateOrSalary').val() >= 0 && (newData.child('role').val() == 'SDC' || newData.child('role').val() == 'GUARD')"
+         }
+       },
+       "laborPayments": {
+         ".read": "auth != null",
+         "$id": {
+           ".write": "auth != null",
+           ".validate": "newData.child('amount').isNumber() && newData.child('amount').val() > 0"
+         }
+       },
+       "$other": {
+         ".read": false,
+         ".write": false
        }
      }
    }
 
-   NOTE: This still checks only that *some* anonymous session exists, not
-   which app-level user is acting (see caveat below) - but it now stops a
-   self-signed-up user from writing role:'MANAGER' into their own account,
-   and stops anyone from editing or deleting other users' accounts once
-   created. Promoting someone to MANAGER has to be done manually in the
-   Firebase Console (Firestore -> users -> edit the role field) since
-   client-side updates to /users are now blocked entirely.
+   NOTE: As with the Firestore version, this only checks that *some*
+   anonymous session exists, not which app-level user is acting - actual
+   login/role checks happen client-side against the `users` node. The
+   ".validate" rules above stop malformed writes but not a signed-in
+   client from reading the whole `users` node (including plaintext
+   passwords), since the login flow itself depends on being able to read
+   it. Promoting someone to MANAGER has to be done manually in the
+   Firebase Console (Realtime Database -> users -> edit the role field)
+   since only 'SDC' self-signup writes are permitted above.
    ========================================================================= */
 
 const FIREBASE_CONFIG = {
@@ -172,6 +214,123 @@ const FIREBASE_CONFIG = {
   appId: "1:953840553698:web:455384bb2ffe3b53a798bb"
 };
 
+/* ------------------------- Realtime Database shim -------------------------
+   Firestore has been swapped out for the Realtime Database REST API (no
+   SDK), matching the architecture used across the rest of the Nexlite
+   product suite. This shim exposes the same chainable
+   collection/where/limit/orderBy/get/doc/add/set/update/onSnapshot/batch
+   surface the rest of this file already calls, so nothing below this
+   block needed to change.
+   ========================================================================= */
+const FieldValue = { serverTimestamp: () => ({ '.sv': 'timestamp' }) };
+
+function rtdbPushId(){
+  const chars = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
+  let id = '';
+  for (let i = 0; i < 20; i++) id += chars.charAt(Math.floor(Math.random()*chars.length));
+  return Date.now().toString(36) + id;
+}
+
+function rtdbCompare(a, b){
+  if (a === b) return 0;
+  if (a === undefined || a === null) return -1;
+  if (b === undefined || b === null) return 1;
+  return a < b ? -1 : 1;
+}
+
+class RTDBClient {
+  constructor(config, getAuthToken){
+    this.baseUrl = (config.databaseURL || '').replace(/\/$/, '');
+    this.getAuthToken = getAuthToken;
+  }
+  async _fetch(path, method='GET', body){
+    const token = await this.getAuthToken();
+    const url = `${this.baseUrl}/${path}.json` + (token ? `?auth=${token}` : '');
+    const opts = { method };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
+    if (!res.ok) {
+      const text = await res.text().catch(()=> '');
+      throw new Error(`Realtime Database ${method} ${path} failed (${res.status}): ${text}`);
+    }
+    return res.status === 204 ? null : res.json();
+  }
+  async _sse(path, onEvent){
+    const token = await this.getAuthToken();
+    const url = `${this.baseUrl}/${path}.json` + (token ? `?auth=${token}` : '');
+    const es = new EventSource(url);
+    es.addEventListener('put', onEvent);
+    es.addEventListener('patch', onEvent);
+    es.onerror = ()=>{}; // EventSource auto-reconnects; surfaced errors are noisy and non-fatal
+    return () => es.close();
+  }
+  collection(name){ return new RTDBCollection(this, name); }
+  batch(){ return new RTDBBatch(this); }
+}
+
+class RTDBQuery {
+  constructor(client, path){
+    this.client = client;
+    this.path = path;
+    this._wheres = [];
+    this._orderField = null;
+    this._desc = false;
+    this._limit = null;
+  }
+  where(field, op, value){ this._wheres.push({field, op, value}); return this; }
+  orderBy(field, dir){ this._orderField = field; this._desc = (dir === 'desc'); return this; }
+  limit(n){ this._limit = n; return this; }
+  async get(){
+    const raw = await this.client._fetch(this.path) || {};
+    let docs = Object.keys(raw).map(id => ({ id, data: raw[id] || {} }));
+    for (const w of this._wheres) {
+      docs = docs.filter(d => w.op === '==' ? d.data[w.field] === w.value : true);
+    }
+    if (this._orderField) {
+      docs.sort((a,b)=> rtdbCompare(a.data[this._orderField], b.data[this._orderField]) * (this._desc ? -1 : 1));
+    }
+    if (this._limit) docs = docs.slice(0, this._limit);
+    return {
+      empty: docs.length === 0,
+      size: docs.length,
+      docs: docs.map(d => ({ id: d.id, data: () => d.data })),
+    };
+  }
+  onSnapshot(onNext, onError){
+    let stopped = false, unsubSSE = null;
+    const refetch = async () => {
+      if (stopped) return;
+      try { onNext(await this.get()); } catch (e) { if (onError) onError(e); }
+    };
+    refetch();
+    this.client._sse(this.path, refetch).then(unsub => { stopped ? unsub() : (unsubSSE = unsub); });
+    return () => { stopped = true; if (unsubSSE) unsubSSE(); };
+  }
+}
+
+class RTDBDoc {
+  constructor(client, path, id){ this.client = client; this.path = path; this.id = id; }
+  set(data){ return this.client._fetch(this.path, 'PUT', data); }
+  update(data){ return this.client._fetch(this.path, 'PATCH', data); }
+  delete(){ return this.client._fetch(this.path, 'DELETE'); }
+}
+
+class RTDBCollection extends RTDBQuery {
+  constructor(client, name){ super(client, name); this.name = name; }
+  doc(id){ id = id || rtdbPushId(); return new RTDBDoc(this.client, `${this.name}/${id}`, id); }
+  async add(data){
+    const result = await this.client._fetch(this.name, 'POST', data);
+    return { id: result.name };
+  }
+}
+
+class RTDBBatch {
+  constructor(client){ this.client = client; this.updates = {}; }
+  set(ref, data){ this.updates[ref.path] = data; return this; }
+  commit(){ return this.client._fetch('', 'PATCH', this.updates); }
+}
+/* ------------------------------------------------------------------------- */
+
 let auth, db, LIBS_OK = true;
 try {
   if (typeof firebase === 'undefined' || typeof Chart === 'undefined') {
@@ -179,7 +338,7 @@ try {
   }
   firebase.initializeApp(FIREBASE_CONFIG);
   auth = firebase.auth();
-  db = firebase.firestore();
+  db = new RTDBClient(FIREBASE_CONFIG, async () => auth.currentUser ? auth.currentUser.getIdToken() : null);
 } catch (e) {
   LIBS_OK = false;
   console.error('Startup error:', e);
@@ -944,7 +1103,7 @@ function attachStockMovementEvents(){
           date: document.getElementById('m-date').value,
           createdById: state.user.id,
           createdByName: state.user.name,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
         });
         toast(`${type} of ${quantity} units recorded successfully`);
         closeModal();
@@ -1056,7 +1215,7 @@ function attachMaizePurchasesEvents(){
           grnNumber: document.getElementById('p-grn').value || null,
           notes: document.getElementById('p-notes').value || null,
           createdById: state.user.id, createdByName: state.user.name,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
         });
         toast(`Purchase of ${quantityKg} kg from ${supplier} recorded`);
         closeModal();
@@ -1157,7 +1316,7 @@ function attachMaizeDispatchesEvents(){
           waybillNumber: document.getElementById('d-waybill').value || null,
           notes: document.getElementById('d-notes').value || null,
           createdById: state.user.id, createdByName: state.user.name,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
         });
         toast(`Dispatch of ${quantityKg} kg to ${destination} recorded`);
         closeModal();
@@ -1272,7 +1431,7 @@ function attachPersonnelEvents(){
           paymentType: payType.value,
           phone: document.getElementById('per-phone').value || null,
           isActive: true,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
         });
         toast(`${name} added as ${role}`);
         closeModal();
@@ -1408,7 +1567,7 @@ function attachLaborPaymentsEvents(){
           period: document.getElementById('lp-period').value || null,
           notes: document.getElementById('lp-notes').value || null,
           createdById: state.user.id, createdByName: state.user.name,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
         });
         toast(`Payment of ZMW ${amount} recorded`);
         closeModal();
