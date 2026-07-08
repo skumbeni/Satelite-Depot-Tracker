@@ -196,6 +196,7 @@ function showLibraryError(){
 /* ---------------------------- Global State ---------------------------- */
 const state = {
   user: null,           // { id, username, name, role, phone }
+  authView: 'login',    // 'login' | 'signup'
   page: 'dashboard',
   sidebarOpen: false,
   stockItems: [],
@@ -286,6 +287,25 @@ async function login(username, password){
   const u = doc.data();
   if (u.password !== password) throw new Error('Invalid username or password');
   const user = { id: doc.id, username: u.username, name: u.name, role: u.role, phone: u.phone || null };
+  state.user = user;
+  localStorage.setItem('depot-auth', JSON.stringify(user));
+  return user;
+}
+
+async function signup(username, password, name, role, phone){
+  await ensureAnonAuth();
+
+  if (!username || !password || !name) throw new Error('Please fill in all required fields.');
+  if (password.length < 6) throw new Error('Password must be at least 6 characters.');
+
+  const existing = await db.collection('users').where('username','==',username).limit(1).get();
+  if (!existing.empty) throw new Error('That username is already taken. Please choose another.');
+
+  const newUserRef = db.collection('users').doc();
+  const userData = { username, password, name, role, phone: phone || null };
+  await newUserRef.set(userData);
+
+  const user = { id: newUserRef.id, username, name, role, phone: phone || null };
   state.user = user;
   localStorage.setItem('depot-auth', JSON.stringify(user));
   return user;
@@ -425,6 +445,7 @@ function render(){
 }
 
 function renderLogin(){
+  const isSignup = state.authView === 'signup';
   return `
   <div class="min-h-screen flex items-center justify-center p-4" style="background:linear-gradient(135deg,#fffbeb,#ffffff,#ecfdf5);">
     <div class="card w-full max-w-md p-8">
@@ -433,6 +454,18 @@ function renderLogin(){
         <h1 class="text-2xl font-bold text-emerald-900">Satellite Depot</h1>
         <p class="text-sm text-gray-500 mt-1">Stock Management System</p>
       </div>
+      ${isSignup ? renderSignupForm() : renderLoginForm()}
+      <p class="text-center text-sm text-gray-500 mt-4">
+        ${isSignup
+          ? `Already have an account? <button id="show-login" class="text-emerald-700 font-medium hover:underline">Sign In</button>`
+          : `Need an account? <button id="show-signup" class="text-emerald-700 font-medium hover:underline">Create one</button>`}
+      </p>
+    </div>
+  </div>`;
+}
+
+function renderLoginForm(){
+  return `
       <form id="login-form" class="space-y-4 mt-6">
         <div>
           <label class="label">Username</label>
@@ -443,40 +476,88 @@ function renderLogin(){
           <input class="input" id="login-password" type="password" placeholder="Enter your password" required autocomplete="current-password">
         </div>
         <button type="submit" id="login-btn" class="btn btn-primary w-full py-2.5">Sign In</button>
-      </form>
-      <div class="mt-6 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 space-y-1">
-        <p class="font-semibold text-gray-700">Demo Credentials:</p>
-        <p>Manager: <span class="font-mono">manager / manager123</span></p>
-        <p>SDC Clerk: <span class="font-mono">sdc1 / sdc123</span></p>
-        <button id="seed-btn" class="btn btn-outline w-full mt-2 text-xs py-1.5">Seed Demo Data (first run only)</button>
-      </div>
-    </div>
-  </div>`;
+      </form>`;
+}
+
+function renderSignupForm(){
+  return `
+      <form id="signup-form" class="space-y-4 mt-6">
+        <div>
+          <label class="label">Full Name</label>
+          <input class="input" id="signup-name" placeholder="Your full name" required autocomplete="name">
+        </div>
+        <div>
+          <label class="label">Username</label>
+          <input class="input" id="signup-username" placeholder="Choose a username" required autocomplete="username">
+        </div>
+        <div>
+          <label class="label">Password</label>
+          <input class="input" id="signup-password" type="password" placeholder="At least 6 characters" required autocomplete="new-password" minlength="6">
+        </div>
+        <div>
+          <label class="label">Role</label>
+          <select class="input" id="signup-role" required>
+            <option value="SDC">SDC Clerk</option>
+            <option value="MANAGER">Depot Manager</option>
+          </select>
+        </div>
+        <div>
+          <label class="label">Phone (optional)</label>
+          <input class="input" id="signup-phone" placeholder="+260XXXXXXXXX" autocomplete="tel">
+        </div>
+        <button type="submit" id="signup-btn" class="btn btn-primary w-full py-2.5">Create Account</button>
+      </form>`;
 }
 
 function attachLoginEvents(){
-  document.getElementById('login-form').addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const btn = document.getElementById('login-btn');
-    const username = document.getElementById('login-username').value.trim();
-    const password = document.getElementById('login-password').value;
-    btn.disabled = true; btn.textContent = 'Signing in...';
-    try{
-      const user = await login(username, password);
-      toast(`Welcome, ${user.name}!`);
-      await startRealtimeSync();
-      render();
-    } catch(err){
-      toast(friendlyAuthError(err), 'error');
-      btn.disabled = false; btn.textContent = 'Sign In';
-    }
-  });
-  document.getElementById('seed-btn').addEventListener('click', async ()=>{
-    const btn = document.getElementById('seed-btn');
-    btn.disabled = true; btn.textContent = 'Seeding...';
-    try{ await seedDemoData(); } catch(err){ toast(err.message,'error'); }
-    btn.disabled = false; btn.textContent = 'Seed Demo Data (first run only)';
-  });
+  const loginForm = document.getElementById('login-form');
+  if (loginForm){
+    loginForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const btn = document.getElementById('login-btn');
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value;
+      btn.disabled = true; btn.textContent = 'Signing in...';
+      try{
+        const user = await login(username, password);
+        toast(`Welcome, ${user.name}!`);
+        await startRealtimeSync();
+        render();
+      } catch(err){
+        toast(friendlyAuthError(err), 'error');
+        btn.disabled = false; btn.textContent = 'Sign In';
+      }
+    });
+  }
+
+  const signupForm = document.getElementById('signup-form');
+  if (signupForm){
+    signupForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const btn = document.getElementById('signup-btn');
+      const name = document.getElementById('signup-name').value.trim();
+      const username = document.getElementById('signup-username').value.trim();
+      const password = document.getElementById('signup-password').value;
+      const role = document.getElementById('signup-role').value;
+      const phone = document.getElementById('signup-phone').value.trim();
+      btn.disabled = true; btn.textContent = 'Creating account...';
+      try{
+        const user = await signup(username, password, name, role, phone);
+        toast(`Welcome, ${user.name}! Your account has been created.`);
+        await startRealtimeSync();
+        render();
+      } catch(err){
+        toast(friendlyAuthError(err), 'error');
+        btn.disabled = false; btn.textContent = 'Create Account';
+      }
+    });
+  }
+
+  const showSignup = document.getElementById('show-signup');
+  if (showSignup) showSignup.addEventListener('click', ()=>{ state.authView = 'signup'; render(); });
+
+  const showLogin = document.getElementById('show-login');
+  if (showLogin) showLogin.addEventListener('click', ()=>{ state.authView = 'login'; render(); });
 }
 
 function renderApp(){
