@@ -180,7 +180,7 @@
        "users": {
          ".read": "auth != null",
          "$userId": {
-           ".write": "auth != null && ((!data.exists() && newData.hasChildren(['username','password','name','role']) && newData.child('username').isString() && newData.child('username').val().length > 0 && newData.child('password').isString() && newData.child('password').val().length >= 6 && newData.child('name').isString() && newData.child('name').val().length > 0 && ((newData.child('role').val() == 'MANAGER' && newData.hasChild('depotIds')) || (newData.child('role').val() == 'SDC' && newData.hasChild('depotId')))) || (data.exists() && newData.child('username').val() == data.child('username').val() && newData.child('password').val() == data.child('password').val() && newData.child('name').val() == data.child('name').val() && newData.child('role').val() == data.child('role').val() && newData.child('deleted').val() == true))"
+           ".write": "auth != null && ((!data.exists() && newData.hasChildren(['username','password','name','role']) && newData.child('username').isString() && newData.child('username').val().length > 0 && newData.child('password').isString() && newData.child('password').val().length >= 6 && newData.child('name').isString() && newData.child('name').val().length > 0 && ((newData.child('role').val() == 'MANAGER' && newData.hasChild('depotIds')) || (newData.child('role').val() == 'SDC' && newData.hasChild('depotId')))) || (data.exists() && newData.child('username').val() == data.child('username').val() && newData.child('password').val() == data.child('password').val() && newData.child('name').val() == data.child('name').val() && newData.child('role').val() == data.child('role').val() && newData.child('ownerUsername').val() == data.child('ownerUsername').val() && ((newData.child('deleted').val() == true) || (data.child('role').val() == 'SDC' && newData.child('deleted').val() == data.child('deleted').val() && (!newData.hasChild('depotId') || (newData.child('depotId').isString() && newData.child('depotId').val().length > 0))) || (data.child('role').val() == 'MANAGER' && newData.child('deleted').val() == data.child('deleted').val() && newData.hasChild('depotIds')))))"
          }
        },
        "stockItems": {
@@ -229,15 +229,25 @@
      }
    }
 
-   NOTE ON THE users WRITE RULE: it now permits exactly one kind of update to
-   an existing user doc - flipping `deleted` to true, with every other field
-   (username/password/name/role) unchanged. This is what powers account
-   deactivation (see deleteSdcAccount): removing an SDC account no longer
-   deletes the Firestore doc, it soft-deletes it, so the username stays
-   permanently reserved and can never be reissued to a different person -
-   and any historical records that reference the account's id keep meaning
-   what they meant. Everything else about an existing user doc is still
-   immutable via these rules; there is no general-purpose update path.
+   NOTE ON THE users WRITE RULE: an existing user doc now permits three kinds
+   of update, with username/password/name/role/ownerUsername always
+   unchanged:
+     1. Flipping `deleted` to true - powers account deactivation (see
+        deleteSdcAccount): removing an SDC account no longer deletes the
+        node, it soft-deletes it, so the username stays permanently reserved
+        and any historical records that reference the account's id keep
+        meaning what they meant.
+     2. For SDC accounts: changing `depotId` to any other non-empty depot id
+        string, or removing it entirely (unlinking). This is what
+        reassignSdcDepot() uses to move an SDC login between depots, or park
+        it as unassigned - the same way a `personnel` record's depotId was
+        always freely editable. Setting depotId to null in an update PATCHes
+        it away (RTDB deletes null-valued keys), which is exactly the
+        "unlinked" state the users read/list logic checks for.
+     3. For MANAGER accounts: adding to `depotIds` (must still be present) -
+        powers createDepot() adding a new depot to an existing Manager's
+        tenant.
+   Nothing else about an existing user doc can be changed via these rules.
 
    NOTE ON TENANT ISOLATION: separation between Managers' tenants
    (ownerUsername) is enforced client-side - the app only ever queries and
@@ -434,7 +444,7 @@ const state = {
   sidebarOpen: false,
   depots: [],            // every depot the current account can see
   currentDepotId: null,   // which depot's data is currently loaded/shown
-  sdcAccounts: [],        // SDC login accounts for the currently selected depot (Manager-only "SDC Accounts" page)
+  sdcAccounts: [],        // every SDC login account owned by this Manager's tenant, across all depots plus unassigned (Manager-only "SDC Accounts" page)
   stockItems: [],
   stockTransactions: [],
   maizePurchases: [],
@@ -613,8 +623,11 @@ async function signup(username, password, name, phone, depotChoice){
    own tenant's depots.
    ================================================================================ */
 async function loadSdcAccounts(){
-  if (!state.currentDepotId) { state.sdcAccounts = []; return; }
-  const snap = await db.collection('users').where('depotId','==',state.currentDepotId).get();
+  // Loads every SDC account belonging to this Manager's tenant - not just
+  // the ones scoped to the currently-selected depot - so the page can show
+  // "Unassigned" accounts (depotId removed via reassignSdcDepot) alongside
+  // ones for each depot, and offer a move-to-depot control on all of them.
+  const snap = await db.collection('users').where('ownerUsername','==',state.user.username).get();
   state.sdcAccounts = snap.docs.map(d=>({ id: d.id, ...d.data() })).filter(u=>u.role==='SDC' && !u.deleted);
 }
 
@@ -667,18 +680,29 @@ function attachUsernameAvailabilityCheck(inputId, statusId){
   });
 }
 
-async function createSdcAccount(username, password, name, phone){
+async function createSdcAccount(username, password, name, phone, depotId){
   if (!username || !password || !name) throw new Error('Please fill in all required fields.');
   if (password.length < 6) throw new Error('Password must be at least 6 characters.');
-  if (!state.currentDepotId) throw new Error('Select a depot first.');
+  if (!depotId) throw new Error('Select a depot first.');
 
   const available = await checkUsernameAvailable(username);
   if (!available) throw new Error('That username is already taken. Please choose another.');
 
   const newUserRef = db.collection('users').doc();
-  await newUserRef.set({ username, password, name, role: 'SDC', phone: phone || null, depotId: state.currentDepotId, ownerUsername: state.user.username });
+  await newUserRef.set({ username, password, name, role: 'SDC', phone: phone || null, depotId, ownerUsername: state.user.username });
   await loadSdcAccounts();
   return newUserRef.id;
+}
+
+// Moves an SDC login between depots, or unlinks it entirely. depotId is
+// the target depot's id, or null/'' to leave the account unassigned (it
+// will disappear from every depot's list until relinked). Guard/SDC
+// `personnel` records have always supported this - depotId there is just a
+// plain field with no immutability rule around it - this brings SDC login
+// accounts to parity with that.
+async function reassignSdcDepot(userId, depotId){
+  await db.collection('users').doc(userId).update({ depotId: depotId || null });
+  await loadSdcAccounts();
 }
 
 async function deleteSdcAccount(userId){
@@ -2005,31 +2029,70 @@ function attachPersonnelEvents(){
 }
 
 /* ============================== SDC ACCOUNTS ============================= */
+// SDC accounts are grouped by depot (including an "Unassigned" bucket for
+// accounts that have been unlinked via the Move control below) rather than
+// filtered to just the currently-selected depot, since an account can now
+// be reassigned to any depot in this Manager's tenant, or parked with no
+// depot at all.
+function sdcDepotOptions(currentDepotId){
+  const unassignedSelected = !currentDepotId ? ' selected' : '';
+  return `<option value=""${unassignedSelected}>Unassigned</option>` + state.depots.map(d=>
+    `<option value="${d.id}"${d.id===currentDepotId?' selected':''}>${esc(d.name)}</option>`
+  ).join('');
+}
+
+function sdcAccountRow(a){
+  return `
+    <tr>
+      <td class="font-medium">${esc(a.name)}</td>
+      <td class="text-xs">${esc(a.username)}</td>
+      <td class="text-xs">${esc(a.phone)||'-'}</td>
+      <td class="text-right">
+        <div class="flex items-center justify-end gap-2">
+          <select class="input input-sm move-account-select" data-id="${a.id}" data-name="${esc(a.name)}">
+            ${sdcDepotOptions(a.depotId || null)}
+          </select>
+          <button class="text-xs text-red-600 hover:underline delete-account-btn" data-id="${a.id}" data-name="${esc(a.name)}">Remove</button>
+        </div>
+      </td>
+    </tr>`;
+}
+
 function renderAccounts(){
-  const noDepot = !state.currentDepotId;
+  const noDepots = state.depots.length===0;
+  const byDepot = state.sdcAccounts.filter(a=>a.depotId);
+  const unassigned = state.sdcAccounts.filter(a=>!a.depotId);
   return `
   <div class="space-y-6">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div><h2 class="text-2xl font-bold">SDC Accounts</h2><p class="text-sm text-gray-500">Login accounts for SDC Clerks at the currently selected depot. Only the Manager can create these.</p></div>
+      <div><h2 class="text-2xl font-bold">SDC Accounts</h2><p class="text-sm text-gray-500">Login accounts for SDC Clerks. Use the depot dropdown on each row to move an account to a different depot, or unassign it. Only the Manager can create these.</p></div>
       <div class="flex gap-2">
         <button id="refresh-btn" class="btn btn-outline">${iconRefresh()} Refresh</button>
-        ${!noDepot ? `<button id="new-account-btn" class="btn btn-primary">${iconPlus()} New SDC Account</button>` : ''}
+        ${!noDepots ? `<button id="new-account-btn" class="btn btn-primary">${iconPlus()} New SDC Account</button>` : ''}
       </div>
     </div>
-    ${noDepot ? `<div class="card p-6 text-center"><p class="text-sm text-gray-500">Select or create a depot first - SDC accounts are always scoped to one depot.</p></div>` : `
+    ${noDepots ? `<div class="card p-6 text-center"><p class="text-sm text-gray-500">Create a depot first - SDC accounts need at least one depot to be scoped to.</p></div>` : `
+    ${state.depots.map(d=>{
+      const accts = byDepot.filter(a=>a.depotId===d.id);
+      return `<div class="card p-4">
+        <h3 class="text-base font-semibold mb-3">${esc(d.name)}</h3>
+        <div class="overflow-x-auto">
+          <table class="datatable">
+            <thead><tr><th>Name</th><th>Username</th><th>Phone</th><th class="text-right">Actions</th></tr></thead>
+            <tbody>
+              ${accts.length===0 ? '<tr><td colspan="4" class="text-center py-8 text-gray-400">No SDC accounts for this depot</td></tr>' : accts.map(sdcAccountRow).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+    }).join('')}
     <div class="card p-4">
-      <h3 class="text-base font-semibold mb-3">Accounts for this depot</h3>
+      <h3 class="text-base font-semibold mb-3">Unassigned</h3>
       <div class="overflow-x-auto">
         <table class="datatable">
           <thead><tr><th>Name</th><th>Username</th><th>Phone</th><th class="text-right">Actions</th></tr></thead>
           <tbody>
-            ${state.sdcAccounts.length===0 ? '<tr><td colspan="4" class="text-center py-8 text-gray-400">No SDC accounts yet for this depot</td></tr>' : state.sdcAccounts.map(a=>`
-              <tr>
-                <td class="font-medium">${esc(a.name)}</td>
-                <td class="text-xs">${esc(a.username)}</td>
-                <td class="text-xs">${esc(a.phone)||'-'}</td>
-                <td class="text-right"><button class="text-xs text-red-600 hover:underline delete-account-btn" data-id="${a.id}" data-name="${esc(a.name)}">Remove</button></td>
-              </tr>`).join('')}
+            ${unassigned.length===0 ? '<tr><td colspan="4" class="text-center py-8 text-gray-400">No unassigned SDC accounts</td></tr>' : unassigned.map(sdcAccountRow).join('')}
           </tbody>
         </table>
       </div>
@@ -2042,12 +2105,13 @@ function sdcAccountModal(){
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal-box">
       <h3 class="text-lg font-bold mb-1">New SDC Account</h3>
-      <p class="text-sm text-gray-500 mb-4">Create a login for an SDC Clerk, scoped to the currently selected depot.</p>
+      <p class="text-sm text-gray-500 mb-4">Create a login for an SDC Clerk. You can move it to a different depot later.</p>
       <form id="account-form" class="space-y-4">
         <div><label class="label">Full Name *</label><input class="input" id="acc-name" placeholder="e.g. Jane Mwansa" required></div>
         <div><label class="label">Username *</label><input class="input" id="acc-username" placeholder="Choose a username" required autocomplete="username"><p id="acc-username-status" class="text-xs mt-1"></p></div>
         <div><label class="label">Password *</label><input class="input" id="acc-password" type="password" placeholder="At least 6 characters" required minlength="6" autocomplete="new-password"></div>
         <div><label class="label">Phone (optional)</label><input class="input" id="acc-phone" placeholder="+260XXXXXXXXX"></div>
+        <div><label class="label">Depot *</label><select class="input" id="acc-depot" required>${state.depots.map(d=>`<option value="${d.id}"${d.id===state.currentDepotId?' selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
           <button type="submit" class="btn btn-primary" id="modal-submit">Create Account</button>
@@ -2070,11 +2134,12 @@ function attachAccountsEvents(){
       const username = document.getElementById('acc-username').value.trim();
       const password = document.getElementById('acc-password').value;
       const phone = document.getElementById('acc-phone').value.trim();
-      if (!name || !username || !password){ toast('Please fill in all required fields','error'); return; }
+      const depotId = document.getElementById('acc-depot').value;
+      if (!name || !username || !password || !depotId){ toast('Please fill in all required fields','error'); return; }
       if (password.length < 6){ toast('Password must be at least 6 characters','error'); return; }
       const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Creating...';
       try{
-        await createSdcAccount(username, password, name, phone);
+        await createSdcAccount(username, password, name, phone, depotId);
         toast(`${name}'s SDC account created`);
         closeModal();
         renderPageAfterFetch();
@@ -2089,6 +2154,17 @@ function attachAccountsEvents(){
         toast(`${btn.dataset.name}'s account removed`);
         renderPageAfterFetch();
       } catch(err){ toast('Failed: '+err.message,'error'); }
+    });
+  });
+  document.querySelectorAll('.move-account-select').forEach(sel=>{
+    sel.addEventListener('change', async ()=>{
+      const depotId = sel.value || null;
+      const depotName = depotId ? (state.depots.find(d=>d.id===depotId)||{}).name : 'Unassigned';
+      try{
+        await reassignSdcDepot(sel.dataset.id, depotId);
+        toast(`${sel.dataset.name} moved to ${depotName}`);
+        renderPageAfterFetch();
+      } catch(err){ toast('Failed to move account: '+err.message,'error'); renderPageAfterFetch(); }
     });
   });
 }
