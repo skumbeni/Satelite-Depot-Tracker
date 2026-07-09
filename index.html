@@ -112,12 +112,40 @@
       Realtime Database -> Rules.
    6. Open this file in a browser (or host it on GitHub Pages). On first
       run, click "Seed Demo Data" on the login screen to create the demo
-      users, stock items and personnel (same as the original seed route).
+      depot, users, stock items and personnel (same as the original seed
+      route).
 
    Demo credentials after seeding:
-     Manager  : manager / manager123
-     SDC Clerk: sdc1 / sdc123
-     SDC Clerk: sdc2 / sdc123
+     Manager  : manager / manager123   (has access to the demo depot)
+     SDC Clerk: sdc1 / sdc123          (scoped to the demo depot)
+     SDC Clerk: sdc2 / sdc123          (scoped to the demo depot)
+
+   ---------------------------------------------------------------------
+   MULTI-DEPOT MODEL
+   ---------------------------------------------------------------------
+   This build supports a Manager overseeing MULTIPLE satellite depots from
+   one account, with data fully separated per depot:
+
+   - "depots" node: { id, name, location, createdAt } - one entry per
+     physical depot. Every other collection (stockItems, stockTransactions,
+     maizePurchases, maizeDispatches, personnel, laborPayments) carries a
+     depotId field and is filtered to the currently-selected depot on the
+     client.
+   - MANAGER accounts store `depotIds`: an array of every depot they
+     manage. The first account ever created (the bootstrap MANAGER) names
+     their first depot right on the signup form; a "Depots" page (visible
+     only to MANAGER) lets them create/rename additional depots afterwards.
+     Creating a depot there automatically adds it to the manager's own
+     depotIds.
+   - SDC Clerk accounts store a single `depotId` - exactly one depot,
+     matching the "2 SDCs + 2 Guards per depot" staffing model. New SDC
+     signups pick their depot from a dropdown of existing depots.
+   - Guards are not login accounts - they're `personnel` records (role
+     GUARD) added by the Manager under whichever depot is currently
+     selected, same as SDC personnel records.
+   - A depot switcher in the sidebar (Manager only) changes which depot's
+     data is being viewed/edited; SDC Clerks always see just their own
+     depot and have no switcher.
 
    ---------------------------------------------------------------------
    REALTIME DATABASE SECURITY RULES (copy into Firebase Console -> Realtime
@@ -125,70 +153,89 @@
    ---------------------------------------------------------------------
    {
      "rules": {
+       "depots": {
+         ".read": "auth != null",
+         "$id": {
+           ".write": "auth != null",
+           ".validate": "newData.hasChildren(['name']) && newData.child('name').isString() && newData.child('name').val().length > 0"
+         }
+       },
        "users": {
          ".read": "auth != null",
          "$userId": {
-           ".write": "auth != null && !data.exists() && newData.hasChildren(['username','password','name','role']) && newData.child('username').isString() && newData.child('username').val().length > 0 && newData.child('password').isString() && newData.child('password').val().length >= 6 && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('role').val() == 'SDC'"
+           ".write": "auth != null && !data.exists() && newData.hasChildren(['username','password','name','role']) && newData.child('username').isString() && newData.child('username').val().length > 0 && newData.child('password').isString() && newData.child('password').val().length >= 6 && newData.child('name').isString() && newData.child('name').val().length > 0 && ((root.child('users').val() == null && newData.child('role').val() == 'MANAGER') || (newData.child('role').val() == 'SDC' && newData.hasChild('depotId')))"
          }
        },
        "stockItems": {
          ".read": "auth != null",
          "$id": {
            ".write": "auth != null",
-           ".validate": "newData.hasChildren(['name','unit']) && newData.child('name').isString() && newData.child('unit').isString()"
+           ".validate": "newData.hasChildren(['name','unit','depotId']) && newData.child('name').isString() && newData.child('unit').isString()"
          }
        },
        "stockTransactions": {
          ".read": "auth != null",
          "$id": {
            ".write": "auth != null",
-           ".validate": "newData.hasChildren(['stockItemId','type','quantity','date']) && newData.child('quantity').isNumber() && newData.child('quantity').val() > 0 && (newData.child('type').val() == 'RECEIPT' || newData.child('type').val() == 'ISSUE' || newData.child('type').val() == 'DAMAGE')"
+           ".validate": "newData.hasChildren(['stockItemId','type','quantity','date','depotId']) && newData.child('quantity').isNumber() && newData.child('quantity').val() > 0 && (newData.child('type').val() == 'RECEIPT' || newData.child('type').val() == 'ISSUE' || newData.child('type').val() == 'DAMAGE')"
          }
        },
        "maizePurchases": {
          ".read": "auth != null",
          "$id": {
            ".write": "auth != null",
-           ".validate": "newData.child('quantityKg').isNumber() && newData.child('quantityKg').val() > 0 && newData.child('totalCost').isNumber() && newData.child('totalCost').val() >= 0"
+           ".validate": "newData.hasChild('depotId') && newData.child('quantityKg').isNumber() && newData.child('quantityKg').val() > 0 && newData.child('totalCost').isNumber() && newData.child('totalCost').val() >= 0"
          }
        },
        "maizeDispatches": {
          ".read": "auth != null",
          "$id": {
            ".write": "auth != null",
-           ".validate": "newData.child('quantityKg').isNumber() && newData.child('quantityKg').val() > 0"
+           ".validate": "newData.hasChild('depotId') && newData.child('quantityKg').isNumber() && newData.child('quantityKg').val() > 0"
          }
        },
        "personnel": {
          ".read": "auth != null",
          "$id": {
            ".write": "auth != null",
-           ".validate": "newData.child('name').isString() && newData.child('rateOrSalary').isNumber() && newData.child('rateOrSalary').val() >= 0 && (newData.child('role').val() == 'SDC' || newData.child('role').val() == 'GUARD')"
+           ".validate": "newData.hasChild('depotId') && newData.child('name').isString() && newData.child('rateOrSalary').isNumber() && newData.child('rateOrSalary').val() >= 0 && (newData.child('role').val() == 'SDC' || newData.child('role').val() == 'GUARD')"
          }
        },
        "laborPayments": {
          ".read": "auth != null",
          "$id": {
            ".write": "auth != null",
-           ".validate": "newData.child('amount').isNumber() && newData.child('amount').val() > 0"
+           ".validate": "newData.hasChild('depotId') && newData.child('amount').isNumber() && newData.child('amount').val() > 0"
          }
        },
-       "$other": {
-         ".read": false,
-         ".write": false
-       }
+       "$other": { ".read": false, ".write": false }
      }
    }
 
    NOTE: This only checks that *some*
    anonymous session exists, not which app-level user is acting - actual
-   login/role checks happen client-side against the `users` node. The
-   ".validate" rules above stop malformed writes but not a signed-in
-   client from reading the whole `users` node (including plaintext
-   passwords), since the login flow itself depends on being able to read
-   it. Promoting someone to MANAGER has to be done manually in the
-   Firebase Console (Realtime Database -> users -> edit the role field)
-   since only 'SDC' self-signup writes are permitted above.
+   login/role checks (including which depot(s) a user may see) happen
+   client-side against the `users` node. The ".validate" rules above stop
+   malformed writes but not a signed-in client from reading the whole
+   `users` node (including plaintext passwords) or another depot's data,
+   since every collection is only readable/writable as a whole (RTDB has
+   no per-field read rules). Treat this the same as the rest of this
+   app's security model: adequate for a small trusted team, not a hard
+   multi-tenant boundary.
+
+   BOOTSTRAP RULE: the very first account ever created (i.e. the users
+   node is completely empty) is allowed to self-register with
+   role == 'MANAGER'. Every signup after that is forced to role == 'SDC'
+   (and must include a depotId) by the rule above, regardless of what the
+   client sends. This means there is no separate "seed" step needed to get
+   a manager account - whoever signs up first on a fresh database becomes
+   the Manager automatically and names their first depot in the same
+   signup form, and the app's signup() function mirrors this logic
+   client-side (see below) so the UI reflects it immediately. Promoting an
+   SDC Clerk to Manager after that still has to be done manually in the
+   Firebase Console (Realtime Database -> users -> edit the role field and
+   add a depotIds array), since only the very first write is allowed to
+   claim MANAGER.
    ========================================================================= */
 
 const FIREBASE_CONFIG = {
@@ -351,10 +398,14 @@ function showLibraryError(){
 
 /* ---------------------------- Global State ---------------------------- */
 const state = {
-  user: null,           // { id, username, name, role, phone }
+  user: null,           // { id, username, name, role, phone, depotId (SDC) | depotIds (MANAGER) }
   authView: 'login',    // 'login' | 'signup'
+  isFirstAccount: false, // whether the next signup would become the bootstrap MANAGER
   page: 'dashboard',
   sidebarOpen: false,
+  depots: [],            // every depot the current account can see
+  currentDepotId: null,   // which depot's data is currently loaded/shown
+  signupDepots: [],       // depots available to pick from on the signup form (non-first accounts)
   stockItems: [],
   stockTransactions: [],
   maizePurchases: [],
@@ -374,8 +425,14 @@ const NAV_ITEMS = [
   { page: 'maize-dispatches', label: 'Maize Dispatches', icon: iconTruck(), managerOnly: false },
   { page: 'personnel', label: 'Personnel', icon: iconUsers(), managerOnly: true },
   { page: 'labor-payments', label: 'Labor Payments', icon: iconCash(), managerOnly: true },
+  { page: 'depots', label: 'Depots', icon: iconTruck(), managerOnly: true },
   { page: 'reports', label: 'Reports & WhatsApp', icon: iconChart(), managerOnly: false },
 ];
+
+function currentDepotName(){
+  const d = state.depots.find(x=>x.id===state.currentDepotId);
+  return d ? d.name : 'Depot';
+}
 
 /* ------------------------------ Utilities ------------------------------ */
 function fmtNum(n){ return Number(n||0).toLocaleString(); }
@@ -435,6 +492,12 @@ async function ensureAnonAuth(){
   }
 }
 
+async function fetchDepotsById(ids){
+  if (!ids || !ids.length) return [];
+  const all = await db.collection('depots').get();
+  return all.docs.map(d=>({id:d.id, ...d.data()})).filter(d=>ids.includes(d.id));
+}
+
 async function login(username, password){
   await ensureAnonAuth();
   const snap = await db.collection('users').where('username','==',username).limit(1).get();
@@ -442,13 +505,46 @@ async function login(username, password){
   const doc = snap.docs[0];
   const u = doc.data();
   if (u.password !== password) throw new Error('Invalid username or password');
-  const user = { id: doc.id, username: u.username, name: u.name, role: u.role, phone: u.phone || null };
+  const user = { id: doc.id, username: u.username, name: u.name, role: u.role, phone: u.phone || null, depotId: u.depotId || null, depotIds: u.depotIds || null };
   state.user = user;
   localStorage.setItem('depot-auth', JSON.stringify(user));
+  await loadDepotsForUser();
   return user;
 }
 
-async function signup(username, password, name, phone){
+async function loadDepotsForUser(){
+  // Populates state.depots with every depot the signed-in account can see,
+  // and picks (or keeps) which one is currently active.
+  const allDepots = (await db.collection('depots').get()).docs.map(d=>({id:d.id, ...d.data()}));
+  if (state.user.role === 'MANAGER') {
+    const ids = state.user.depotIds || [];
+    state.depots = allDepots.filter(d=>ids.includes(d.id)).sort((a,b)=>rtdbCompare(a.name,b.name));
+    const saved = localStorage.getItem('depot-current-id');
+    state.currentDepotId = (saved && ids.includes(saved)) ? saved : (state.depots[0] ? state.depots[0].id : null);
+  } else {
+    state.depots = allDepots.filter(d=>d.id === state.user.depotId);
+    state.currentDepotId = state.user.depotId || null;
+  }
+  if (state.currentDepotId) localStorage.setItem('depot-current-id', state.currentDepotId);
+}
+
+async function switchDepot(depotId){
+  if (depotId === state.currentDepotId) return;
+  state.currentDepotId = depotId;
+  localStorage.setItem('depot-current-id', depotId);
+  stopRealtimeSync();
+  await startRealtimeSync();
+  render();
+}
+
+async function isFirstAccountBootstrap(){
+  // The very first account on a fresh database becomes MANAGER; every
+  // account after that is forced to SDC (mirrors the RTDB security rule).
+  const userCount = (await db.collection('users').limit(1).get()).size;
+  return userCount === 0;
+}
+
+async function signup(username, password, name, phone, depotChoice){
   await ensureAnonAuth();
 
   if (!username || !password || !name) throw new Error('Please fill in all required fields.');
@@ -457,20 +553,58 @@ async function signup(username, password, name, phone){
   const existing = await db.collection('users').where('username','==',username).limit(1).get();
   if (!existing.empty) throw new Error('That username is already taken. Please choose another.');
 
-  const newUserRef = db.collection('users').doc();
-  const userData = { username, password, name, role: 'SDC', phone: phone || null };
-  await newUserRef.set(userData);
+  const isFirst = await isFirstAccountBootstrap();
+  const role = isFirst ? 'MANAGER' : 'SDC';
 
-  const user = { id: newUserRef.id, username, name, role: 'SDC', phone: phone || null };
+  const newUserRef = db.collection('users').doc();
+  let userData, user;
+
+  if (isFirst) {
+    // Bootstrap manager also creates their first depot right here.
+    const depotName = (depotChoice && depotChoice.newDepotName) || 'Main Depot';
+    const depotRef = db.collection('depots').doc();
+    await depotRef.set({ name: depotName, location: null, createdAt: FieldValue.serverTimestamp() });
+    userData = { username, password, name, role, phone: phone || null, depotIds: [depotRef.id] };
+    user = { id: newUserRef.id, username, name, role, phone: phone || null, depotId: null, depotIds: [depotRef.id] };
+  } else {
+    const depotId = depotChoice && depotChoice.depotId;
+    if (!depotId) throw new Error('Please select which depot you work at.');
+    userData = { username, password, name, role, phone: phone || null, depotId };
+    user = { id: newUserRef.id, username, name, role, phone: phone || null, depotId, depotIds: null };
+  }
+
+  await newUserRef.set(userData);
   state.user = user;
   localStorage.setItem('depot-auth', JSON.stringify(user));
+  await loadDepotsForUser();
   return user;
+}
+
+async function createDepot(name, location){
+  if (!name || !name.trim()) throw new Error('Depot name is required.');
+  const depotRef = db.collection('depots').doc();
+  await depotRef.set({ name: name.trim(), location: location ? location.trim() : null, createdAt: FieldValue.serverTimestamp() });
+  const newDepotIds = [...(state.user.depotIds || []), depotRef.id];
+  await db.collection('users').doc(state.user.id).update({ depotIds: newDepotIds });
+  state.user.depotIds = newDepotIds;
+  localStorage.setItem('depot-auth', JSON.stringify(state.user));
+  await loadDepotsForUser();
+  return depotRef.id;
+}
+
+async function renameDepot(depotId, name, location){
+  if (!name || !name.trim()) throw new Error('Depot name is required.');
+  await db.collection('depots').doc(depotId).update({ name: name.trim(), location: location ? location.trim() : null });
+  await loadDepotsForUser();
 }
 
 function logout(){
   stopRealtimeSync();
   state.user = null;
+  state.depots = [];
+  state.currentDepotId = null;
   localStorage.removeItem('depot-auth');
+  localStorage.removeItem('depot-current-id');
   render();
 }
 
@@ -479,22 +613,26 @@ async function seedDemoData(){
   const userCount = (await db.collection('users').limit(1).get()).size;
   if (userCount > 0) { toast('Demo data already exists'); return; }
 
+  const depotRef = db.collection('depots').doc();
+  await depotRef.set({ name: 'Demo Satellite Depot', location: null, createdAt: FieldValue.serverTimestamp() });
+  const depotId = depotRef.id;
+
   const batch = db.batch();
   const usersRef = db.collection('users');
-  batch.set(usersRef.doc(), { username:'manager', password:'manager123', name:'Depot Manager', role:'MANAGER', phone:'+260XXXXXXXXX' });
-  batch.set(usersRef.doc(), { username:'sdc1', password:'sdc123', name:'SDC Clerk 1', role:'SDC', phone:null });
-  batch.set(usersRef.doc(), { username:'sdc2', password:'sdc123', name:'SDC Clerk 2', role:'SDC', phone:null });
+  batch.set(usersRef.doc(), { username:'manager', password:'manager123', name:'Depot Manager', role:'MANAGER', phone:'+260XXXXXXXXX', depotIds:[depotId] });
+  batch.set(usersRef.doc(), { username:'sdc1', password:'sdc123', name:'SDC Clerk 1', role:'SDC', phone:null, depotId });
+  batch.set(usersRef.doc(), { username:'sdc2', password:'sdc123', name:'SDC Clerk 2', role:'SDC', phone:null, depotId });
 
   const stockItemsRef = db.collection('stockItems');
   [['Tents','pcs'],['Sprayers','pcs'],['Twine','rolls'],['Markers','pcs'],['Empty Grain Bags','pcs']].forEach(([name,unit])=>{
-    batch.set(stockItemsRef.doc(), { name, unit });
+    batch.set(stockItemsRef.doc(), { name, unit, depotId });
   });
 
   const personnelRef = db.collection('personnel');
-  batch.set(personnelRef.doc(), { name:'SDC Personnel 1', role:'SDC', rateOrSalary:5000, paymentType:'MONTHLY', phone:null, isActive:true });
-  batch.set(personnelRef.doc(), { name:'SDC Personnel 2', role:'SDC', rateOrSalary:5000, paymentType:'MONTHLY', phone:null, isActive:true });
-  batch.set(personnelRef.doc(), { name:'Guard 1', role:'GUARD', rateOrSalary:3000, paymentType:'MONTHLY', phone:null, isActive:true });
-  batch.set(personnelRef.doc(), { name:'Guard 2', role:'GUARD', rateOrSalary:3000, paymentType:'MONTHLY', phone:null, isActive:true });
+  batch.set(personnelRef.doc(), { name:'SDC Personnel 1', role:'SDC', rateOrSalary:5000, paymentType:'MONTHLY', phone:null, isActive:true, depotId });
+  batch.set(personnelRef.doc(), { name:'SDC Personnel 2', role:'SDC', rateOrSalary:5000, paymentType:'MONTHLY', phone:null, isActive:true, depotId });
+  batch.set(personnelRef.doc(), { name:'Guard 1', role:'GUARD', rateOrSalary:3000, paymentType:'MONTHLY', phone:null, isActive:true, depotId });
+  batch.set(personnelRef.doc(), { name:'Guard 2', role:'GUARD', rateOrSalary:3000, paymentType:'MONTHLY', phone:null, isActive:true, depotId });
 
   await batch.commit();
   toast('Demo data seeded! Try manager / manager123');
@@ -520,6 +658,14 @@ const SYNC_COLLECTIONS = [
 
 function startRealtimeSync(){
   if (state.listeners.length) return Promise.resolve(); // already syncing
+  if (!state.currentDepotId) {
+    // No depot selected yet (e.g. a brand-new Manager with zero depots) -
+    // nothing to sync until one exists.
+    SYNC_COLLECTIONS.forEach(c=>{ state[c.stateKey] = []; });
+    state.dataReady = true;
+    state.loading = false;
+    return Promise.resolve();
+  }
   state.loading = true;
   let pending = SYNC_COLLECTIONS.length;
   return new Promise(resolve=>{
@@ -530,7 +676,7 @@ function startRealtimeSync(){
       }
     };
     SYNC_COLLECTIONS.forEach(c=>{
-      let q = db.collection(c.name);
+      let q = db.collection(c.name).where('depotId','==',state.currentDepotId);
       q = c.desc ? q.orderBy(c.orderField,'desc') : q.orderBy(c.orderField);
       const unsub = q.onSnapshot(snap=>{
         state[c.stateKey] = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -654,7 +800,22 @@ function renderSignupForm(){
           <label class="label">Phone (optional)</label>
           <input class="input" id="signup-phone" placeholder="+260XXXXXXXXX" autocomplete="tel">
         </div>
-        <p class="text-xs text-gray-400">New accounts start as SDC Clerk. A manager can upgrade your role afterward if needed.</p>
+        ${state.isFirstAccount ? `
+        <div>
+          <label class="label">Your First Depot's Name *</label>
+          <input class="input" id="signup-depot-name" placeholder="e.g. Mansa Satellite Depot" required>
+        </div>
+        <p class="text-xs text-gray-400">This account will be created as the Manager account, with access to this depot. You can add more depots afterwards from the Depots page.</p>
+        ` : `
+        <div>
+          <label class="label">Depot *</label>
+          <select class="input" id="signup-depot" required>
+            <option value="">${state.signupDepots.length ? 'Select your depot' : 'No depots exist yet - ask your Manager'}</option>
+            ${state.signupDepots.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}
+          </select>
+        </div>
+        <p class="text-xs text-gray-400">New accounts start as SDC Clerk, scoped to the depot you select above. If you need Manager access, ask your Depot Manager to change your role in the system.</p>
+        `}
         <button type="submit" id="signup-btn" class="btn btn-primary w-full py-2.5">Create Account</button>
       </form>`;
 }
@@ -689,9 +850,13 @@ function attachLoginEvents(){
       const username = document.getElementById('signup-username').value.trim();
       const password = document.getElementById('signup-password').value;
       const phone = document.getElementById('signup-phone').value.trim();
+      const depotChoice = state.isFirstAccount
+        ? { newDepotName: (document.getElementById('signup-depot-name').value || '').trim() }
+        : { depotId: document.getElementById('signup-depot').value };
+      if (!state.isFirstAccount && !depotChoice.depotId){ toast('Please select a depot', 'error'); return; }
       btn.disabled = true; btn.textContent = 'Creating account...';
       try{
-        const user = await signup(username, password, name, phone);
+        const user = await signup(username, password, name, phone, depotChoice);
         toast(`Welcome, ${user.name}! Your account has been created.`);
         await startRealtimeSync();
         render();
@@ -703,7 +868,18 @@ function attachLoginEvents(){
   }
 
   const showSignup = document.getElementById('show-signup');
-  if (showSignup) showSignup.addEventListener('click', ()=>{ state.authView = 'signup'; render(); });
+  if (showSignup) showSignup.addEventListener('click', async ()=>{
+    state.authView = 'signup';
+    render();
+    try{
+      await ensureAnonAuth();
+      state.isFirstAccount = await isFirstAccountBootstrap();
+      if (!state.isFirstAccount){
+        state.signupDepots = (await db.collection('depots').get()).docs.map(d=>({id:d.id, ...d.data()}));
+      }
+      if (state.authView === 'signup') render();
+    } catch(err){ /* leave default (non-first-account) hint on failure */ }
+  });
 
   const showLogin = document.getElementById('show-login');
   if (showLogin) showLogin.addEventListener('click', ()=>{ state.authView = 'login'; render(); });
@@ -712,6 +888,7 @@ function attachLoginEvents(){
 function renderApp(){
   const items = NAV_ITEMS.filter(i => !i.managerOnly || state.user.role === 'MANAGER');
   const initials = state.user.name.split(' ').map(n=>n[0]).join('').slice(0,2);
+  const isManager = state.user.role === 'MANAGER';
   return `
   ${state.sidebarOpen ? `<div id="sidebar-overlay" class="fixed inset-0 bg-black/40 z-40 lg:hidden"></div>` : ''}
   <aside id="sidebar" class="fixed top-0 left-0 z-50 h-full w-64 bg-white border-r flex flex-col ${state.sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0">
@@ -722,6 +899,18 @@ function renderApp(){
         <p class="text-xs text-gray-500">Stock Management</p>
       </div>
       <button id="sidebar-close" class="lg:hidden text-gray-500">${iconX()}</button>
+    </div>
+    <div class="px-3 pt-3">
+      ${isManager && state.depots.length ? `
+        <select id="depot-switcher" class="input text-xs font-medium">
+          ${state.depots.map(d=>`<option value="${d.id}" ${d.id===state.currentDepotId?'selected':''}>${esc(d.name)}</option>`).join('')}
+        </select>
+      ` : `
+        <div class="rounded-lg bg-gray-50 px-2.5 py-2 text-xs">
+          <p class="text-gray-400">Depot</p>
+          <p class="font-medium text-gray-700 truncate">${esc(currentDepotName())}</p>
+        </div>
+      `}
     </div>
     <nav class="flex-1 overflow-y-auto py-3 px-3 space-y-1">
       ${items.map(i => `<div class="nav-item ${state.page===i.page?'active':''}" data-page="${i.page}">${i.icon}${i.label}</div>`).join('')}
@@ -760,6 +949,11 @@ function attachAppEvents(){
   if (closeBtn) closeBtn.addEventListener('click', ()=>{ state.sidebarOpen = false; render(); });
   const overlay = document.getElementById('sidebar-overlay');
   if (overlay) overlay.addEventListener('click', ()=>{ state.sidebarOpen = false; render(); });
+  const depotSwitcher = document.getElementById('depot-switcher');
+  if (depotSwitcher) depotSwitcher.addEventListener('change', async (e)=>{
+    state.page = 'dashboard';
+    await switchDepot(e.target.value);
+  });
 }
 
 async function renderPageContent(){
@@ -768,13 +962,15 @@ async function renderPageContent(){
   await startRealtimeSync(); // no-op if already syncing; resolves once live data is loaded
   const el2 = document.getElementById('page-content');
   if (!el2) return; // page may have changed while awaiting
-  switch(state.page){
+  const page = (state.user.role==='MANAGER' && state.depots.length===0) ? 'depots' : state.page;
+  switch(page){
     case 'dashboard': el2.innerHTML = renderDashboard(); attachDashboardEvents(); break;
     case 'stock-movement': el2.innerHTML = renderStockMovement(); attachStockMovementEvents(); break;
     case 'maize-purchases': el2.innerHTML = renderMaizePurchases(); attachMaizePurchasesEvents(); break;
     case 'maize-dispatches': el2.innerHTML = renderMaizeDispatches(); attachMaizeDispatchesEvents(); break;
     case 'personnel': el2.innerHTML = renderPersonnel(); attachPersonnelEvents(); break;
     case 'labor-payments': el2.innerHTML = renderLaborPayments(); attachLaborPaymentsEvents(); break;
+    case 'depots': el2.innerHTML = renderDepots(); attachDepotsEvents(); break;
     case 'reports': el2.innerHTML = renderReports(); attachReportsEvents(); break;
     default: el2.innerHTML = renderDashboard(); attachDashboardEvents();
   }
@@ -790,15 +986,107 @@ async function refreshCurrentPage(){
 function renderPageAfterFetch(){
   const el = document.getElementById('page-content');
   if (!el) return;
-  switch(state.page){
+  const page = (state.user.role==='MANAGER' && state.depots.length===0) ? 'depots' : state.page;
+  switch(page){
     case 'dashboard': el.innerHTML = renderDashboard(); attachDashboardEvents(); break;
     case 'stock-movement': el.innerHTML = renderStockMovement(); attachStockMovementEvents(); break;
     case 'maize-purchases': el.innerHTML = renderMaizePurchases(); attachMaizePurchasesEvents(); break;
     case 'maize-dispatches': el.innerHTML = renderMaizeDispatches(); attachMaizeDispatchesEvents(); break;
     case 'personnel': el.innerHTML = renderPersonnel(); attachPersonnelEvents(); break;
     case 'labor-payments': el.innerHTML = renderLaborPayments(); attachLaborPaymentsEvents(); break;
+    case 'depots': el.innerHTML = renderDepots(); attachDepotsEvents(); break;
     case 'reports': el.innerHTML = renderReports(); attachReportsEvents(); break;
   }
+}
+
+/* ================================ DEPOTS ================================ */
+function renderDepots(){
+  const noDepotsYet = state.depots.length === 0;
+  return `
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div><h2 class="text-2xl font-bold">Depots</h2><p class="text-sm text-gray-500">Depots you manage. Each depot has its own stock, personnel, and transaction history.</p></div>
+      <button id="new-depot-btn" class="btn btn-primary">${iconPlus()} New Depot</button>
+    </div>
+    ${noDepotsYet ? `<div class="card p-6 text-center"><p class="text-sm text-gray-500">You don't have any depots yet. Create your first one to get started - your account already has Manager access, it just needs somewhere to manage.</p></div>` : `
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      ${state.depots.map(d=>`
+        <div class="card p-4">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <p class="font-semibold truncate">${esc(d.name)}${d.id===state.currentDepotId?' <span class="badge bg-emerald-100 text-emerald-800">Active</span>':''}</p>
+              <p class="text-xs text-gray-500 mt-1">${esc(d.location)||'No location set'}</p>
+            </div>
+          </div>
+          <div class="flex gap-2 mt-3">
+            ${d.id!==state.currentDepotId ? `<button class="btn btn-outline text-xs py-1.5" data-switch="${d.id}">Switch to this depot</button>` : ''}
+            <button class="btn btn-outline text-xs py-1.5" data-edit="${d.id}" data-name="${esc(d.name)}" data-location="${esc(d.location)||''}">Rename</button>
+          </div>
+        </div>`).join('')}
+    </div>`}
+  </div>`;
+}
+
+function depotModal(existing){
+  const isEdit = !!existing;
+  return `
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold mb-1">${isEdit ? 'Rename Depot' : 'New Depot'}</h3>
+      <p class="text-sm text-gray-500 mb-4">${isEdit ? 'Update this depot\'s name or location.' : 'Add another satellite depot to manage. It starts empty - staff and stock are added separately per depot.'}</p>
+      <form id="depot-form" class="space-y-4">
+        <div><label class="label">Depot Name *</label><input class="input" id="d-name" value="${isEdit?esc(existing.name):''}" placeholder="e.g. Kawambwa Satellite Depot" required></div>
+        <div><label class="label">Location</label><input class="input" id="d-location" value="${isEdit?esc(existing.location):''}" placeholder="e.g. Kawambwa District"></div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-submit">${isEdit ? 'Save Changes' : 'Create Depot'}</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
+function attachDepotsEvents(){
+  const newBtn = document.getElementById('new-depot-btn');
+  if (newBtn) newBtn.addEventListener('click', ()=>{
+    document.getElementById('modal-root').innerHTML = depotModal(null);
+    bindModalClose();
+    document.getElementById('depot-form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const name = document.getElementById('d-name').value.trim();
+      const location = document.getElementById('d-location').value.trim();
+      if (!name){ toast('Depot name is required','error'); return; }
+      const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
+      try{
+        const newId = await createDepot(name, location);
+        toast(`${name} created`);
+        closeModal();
+        await switchDepot(newId);
+      } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Create Depot'; }
+    });
+  });
+  document.querySelectorAll('[data-switch]').forEach(el=>{
+    el.addEventListener('click', ()=>switchDepot(el.dataset.switch));
+  });
+  document.querySelectorAll('[data-edit]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      document.getElementById('modal-root').innerHTML = depotModal({ id: el.dataset.edit, name: el.dataset.name, location: el.dataset.location });
+      bindModalClose();
+      document.getElementById('depot-form').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const name = document.getElementById('d-name').value.trim();
+        const location = document.getElementById('d-location').value.trim();
+        if (!name){ toast('Depot name is required','error'); return; }
+        const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
+        try{
+          await renameDepot(el.dataset.edit, name, location);
+          toast('Depot updated');
+          closeModal();
+          renderPageAfterFetch();
+        } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Save Changes'; }
+      });
+    });
+  });
 }
 
 /* ============================== DASHBOARD ============================== */
@@ -1088,6 +1376,7 @@ function attachStockMovementEvents(){
           reference: document.getElementById('m-ref').value || null,
           notes: document.getElementById('m-notes').value || null,
           date: document.getElementById('m-date').value,
+          depotId: state.currentDepotId,
           createdById: state.user.id,
           createdByName: state.user.name,
           createdAt: FieldValue.serverTimestamp(),
@@ -1201,6 +1490,7 @@ function attachMaizePurchasesEvents(){
           supplier, quantityKg, pricePerKg, totalCost: quantityKg*pricePerKg,
           grnNumber: document.getElementById('p-grn').value || null,
           notes: document.getElementById('p-notes').value || null,
+          depotId: state.currentDepotId,
           createdById: state.user.id, createdByName: state.user.name,
           createdAt: FieldValue.serverTimestamp(),
         });
@@ -1302,6 +1592,7 @@ function attachMaizeDispatchesEvents(){
           driverName: document.getElementById('d-driver').value || null,
           waybillNumber: document.getElementById('d-waybill').value || null,
           notes: document.getElementById('d-notes').value || null,
+          depotId: state.currentDepotId,
           createdById: state.user.id, createdByName: state.user.name,
           createdAt: FieldValue.serverTimestamp(),
         });
@@ -1418,6 +1709,7 @@ function attachPersonnelEvents(){
           paymentType: payType.value,
           phone: document.getElementById('per-phone').value || null,
           isActive: true,
+          depotId: state.currentDepotId,
           createdAt: FieldValue.serverTimestamp(),
         });
         toast(`${name} added as ${role}`);
@@ -1553,6 +1845,7 @@ function attachLaborPaymentsEvents(){
           amount,
           period: document.getElementById('lp-period').value || null,
           notes: document.getElementById('lp-notes').value || null,
+          depotId: state.currentDepotId,
           createdById: state.user.id, createdByName: state.user.name,
           createdAt: FieldValue.serverTimestamp(),
         });
@@ -1673,7 +1966,11 @@ function attachReportsEvents(){
   if (!LIBS_OK || window.__depotLibFailed) return;
   const saved = localStorage.getItem('depot-auth');
   if (saved){
-    try{ state.user = JSON.parse(saved); await ensureAnonAuth(); } catch(e){ state.user = null; }
+    try{
+      state.user = JSON.parse(saved);
+      await ensureAnonAuth();
+      await loadDepotsForUser();
+    } catch(e){ state.user = null; }
   }
   try{
     render();
