@@ -317,12 +317,23 @@ class RTDBClient {
     this.baseUrl = (config.databaseURL || '').replace(/\/$/, '');
     this.getAuthToken = getAuthToken;
   }
-  async _fetch(path, method='GET', body){
+  async _fetch(path, method='GET', body, extraQuery){
     const token = await this.getAuthToken();
-    const url = `${this.baseUrl}/${path}.json` + (token ? `?auth=${token}` : '');
-    const opts = { method };
+    let url = `${this.baseUrl}/${path}.json` + (token ? `?auth=${token}` : '');
+    if (extraQuery) url += (token ? '&' : '?') + extraQuery;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s: fail loudly instead of spinning forever on a bad connection
+    const opts = { method, signal: controller.signal };
     if (body !== undefined) opts.body = JSON.stringify(body);
-    const res = await fetch(url, opts);
+    let res;
+    try {
+      res = await fetch(url, opts);
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error('Request timed out - check your internet connection and try again.');
+      throw e;
+    } finally {
+      clearTimeout(timeoutId);
+    }
     if (!res.ok) {
       const text = await res.text().catch(()=> '');
       throw new Error(`Realtime Database ${method} ${path} failed (${res.status}): ${text}`);
@@ -355,15 +366,35 @@ class RTDBQuery {
   orderBy(field, dir){ this._orderField = field; this._desc = (dir === 'desc'); return this; }
   limit(n){ this._limit = n; return this; }
   async get(){
-    const raw = await this.client._fetch(this.path) || {};
+    // When there's exactly one '==' filter (the overwhelmingly common case
+    // in this app), ask the Realtime Database REST API to do the filtering
+    // server-side via orderBy/equalTo, so we only download the matching
+    // rows instead of the entire node. This matters a lot on slow/limited
+    // connections and as collections grow across tenants.
+    // NOTE: for best performance this needs a ".indexOn" rule for the
+    // filtered field at this path in your Firebase Realtime Database rules
+    // (e.g. "users": { ".indexOn": ["username", "ownerUsername"] }).
+    // It will still work correctly without the index, just with a slower
+    // server-side scan and a console warning from Firebase.
+    let raw;
+    const singleEqWhere = (this._wheres.length === 1 && this._wheres[0].op === '==') ? this._wheres[0] : null;
+    if (singleEqWhere) {
+      const q = `orderBy=${encodeURIComponent(JSON.stringify(singleEqWhere.field))}&equalTo=${encodeURIComponent(JSON.stringify(singleEqWhere.value))}`
+        + (this._limit ? `&limitToFirst=${this._limit}` : '');
+      raw = await this.client._fetch(this.path, 'GET', undefined, q) || {};
+    } else {
+      raw = await this.client._fetch(this.path) || {};
+    }
     let docs = Object.keys(raw).map(id => ({ id, data: raw[id] || {} }));
-    for (const w of this._wheres) {
-      docs = docs.filter(d => w.op === '==' ? d.data[w.field] === w.value : true);
+    if (!singleEqWhere) {
+      for (const w of this._wheres) {
+        docs = docs.filter(d => w.op === '==' ? d.data[w.field] === w.value : true);
+      }
     }
     if (this._orderField) {
       docs.sort((a,b)=> rtdbCompare(a.data[this._orderField], b.data[this._orderField]) * (this._desc ? -1 : 1));
     }
-    if (this._limit) docs = docs.slice(0, this._limit);
+    if (this._limit && !singleEqWhere) docs = docs.slice(0, this._limit);
     return {
       empty: docs.length === 0,
       size: docs.length,
