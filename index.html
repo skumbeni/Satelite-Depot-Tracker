@@ -557,14 +557,14 @@ const state = {
 
 const NAV_ITEMS = [
   { page: 'dashboard', label: 'Dashboard', icon: iconDashboard(), managerOnly: false },
-  { page: 'stock-movement', label: 'Stock Movement', icon: iconSwap(), managerOnly: false },
+  { page: 'stock-ops', label: 'Stock & Dispatches', icon: iconSwap(), managerOnly: false },
   { page: 'maize-purchases', label: 'Maize Purchases', icon: iconCart(), managerOnly: false },
-  { page: 'maize-dispatches', label: 'Maize Dispatches', icon: iconTruck(), managerOnly: false },
   { page: 'personnel', label: 'Personnel', icon: iconUsers(), managerOnly: true },
   { page: 'accounts', label: 'SDC Accounts', icon: iconUsers(), managerOnly: true },
   { page: 'labor-payments', label: 'Labor Payments', icon: iconCash(), managerOnly: true },
   { page: 'depots', label: 'Depots', icon: iconTruck(), managerOnly: true },
   { page: 'reports', label: 'Reports & WhatsApp', icon: iconChart(), managerOnly: false },
+  { page: 'settings', label: 'Settings', icon: iconSettings(), managerOnly: false },
 ];
 
 function currentDepotName(){
@@ -669,6 +669,7 @@ function iconX(){ return svgIcon('<path d="M18 6L6 18M6 6l12 12"/>'); }
 function iconLogout(){ return svgIcon('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>'); }
 function iconWhatsapp(){ return svgIcon('<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>'); }
 function iconCopy(){ return svgIcon('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'); }
+function iconSettings(){ return svgIcon('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'); }
 
 function friendlyAuthError(err){
   const code = err && err.code;
@@ -1020,7 +1021,9 @@ function startRealtimeSync(){
         let q = db.collection(c.name).where('depotId','==',state.currentDepotId);
         q = c.desc ? q.orderBy(c.orderField,'desc') : q.orderBy(c.orderField);
         const unsub = q.onSnapshot(snap=>{
-          state[c.stateKey] = snap.docs.map(d=>({id:d.id, ...d.data()}));
+          let docs = snap.docs.map(d=>({id:d.id, ...d.data()}));
+          if (c.name === 'stockItems') docs = docs.filter(item=>!item.deleted);
+          state[c.stateKey] = docs;
           cacheSave(c.name, state.currentDepotId, state[c.stateKey]);
           state.usingCachedData = false;
           markReceived();
@@ -1080,11 +1083,29 @@ function computeStockBalances(items=state.stockItems, txs=state.stockTransaction
   });
 }
 
+const KG_PER_BAG = 50;
+function kgToBags(kg){ return Math.round(((Number(kg)||0) / KG_PER_BAG) * 10) / 10; }
+function fmtBags(kg){ return fmtNum(kgToBags(kg)); }
+function fmtKgBags(kg){ return `${fmtNum(kg)} kg (${fmtBags(kg)} bags)`; }
+
 function computeMaizeBalance(purchases=state.maizePurchases, dispatches=state.maizeDispatches){
   const totalPurchasedKg = purchases.reduce((s,p)=>s+p.quantityKg,0);
   const totalDispatchedKg = dispatches.reduce((s,d)=>s+d.quantityKg,0);
   const totalPurchaseCost = purchases.reduce((s,p)=>s+p.totalCost,0);
-  return { totalPurchasedKg, totalDispatchedKg, balanceKg: totalPurchasedKg-totalDispatchedKg, totalPurchaseCost };
+  const balanceKg = totalPurchasedKg-totalDispatchedKg;
+  return {
+    totalPurchasedKg, totalDispatchedKg, balanceKg, totalPurchaseCost,
+    totalPurchasedBags: kgToBags(totalPurchasedKg),
+    totalDispatchedBags: kgToBags(totalDispatchedKg),
+    balanceBags: kgToBags(balanceKg),
+  };
+}
+
+function lastPrcnToday(purchases=state.maizePurchases){
+  const today = todayStr();
+  const todays = purchases.filter(p=>p.date===today && p.prcnNumber);
+  if (todays.length===0) return null;
+  return todays[0].prcnNumber;
 }
 
 function laborPaymentsThisMonth(payments=state.laborPayments){
@@ -1469,27 +1490,27 @@ async function renderPageContent(){
   let body;
   switch(page){
     case 'dashboard': body = renderDashboard(); break;
-    case 'stock-movement': body = renderStockMovement(); break;
+    case 'stock-ops': body = renderStockOps(); break;
     case 'maize-purchases': body = renderMaizePurchases(); break;
-    case 'maize-dispatches': body = renderMaizeDispatches(); break;
     case 'personnel': body = renderPersonnel(); break;
     case 'accounts': body = renderAccounts(); break;
     case 'labor-payments': body = renderLaborPayments(); break;
     case 'depots': body = renderDepots(); break;
     case 'reports': body = renderReports(); break;
+    case 'settings': body = renderSettings(); break;
     default: body = renderDashboard();
   }
   el2.innerHTML = offlineBannerHtml() + body;
   switch(page){
     case 'dashboard': attachDashboardEvents(); break;
-    case 'stock-movement': attachStockMovementEvents(); break;
+    case 'stock-ops': attachStockOpsEvents(); break;
     case 'maize-purchases': attachMaizePurchasesEvents(); break;
-    case 'maize-dispatches': attachMaizeDispatchesEvents(); break;
     case 'personnel': attachPersonnelEvents(); break;
     case 'accounts': attachAccountsEvents(); break;
     case 'labor-payments': attachLaborPaymentsEvents(); break;
     case 'depots': attachDepotsEvents(); break;
     case 'reports': attachReportsEvents(); break;
+    case 'settings': attachSettingsEvents(); break;
     default: attachDashboardEvents();
   }
 }
@@ -1508,27 +1529,27 @@ async function renderPageAfterFetch(){
   let body;
   switch(page){
     case 'dashboard': body = renderDashboard(); break;
-    case 'stock-movement': body = renderStockMovement(); break;
+    case 'stock-ops': body = renderStockOps(); break;
     case 'maize-purchases': body = renderMaizePurchases(); break;
-    case 'maize-dispatches': body = renderMaizeDispatches(); break;
     case 'personnel': body = renderPersonnel(); break;
     case 'accounts': body = renderAccounts(); break;
     case 'labor-payments': body = renderLaborPayments(); break;
     case 'depots': body = renderDepots(); break;
     case 'reports': body = renderReports(); break;
+    case 'settings': body = renderSettings(); break;
     default: return;
   }
   el.innerHTML = offlineBannerHtml() + body;
   switch(page){
     case 'dashboard': attachDashboardEvents(); break;
-    case 'stock-movement': attachStockMovementEvents(); break;
+    case 'stock-ops': attachStockOpsEvents(); break;
     case 'maize-purchases': attachMaizePurchasesEvents(); break;
-    case 'maize-dispatches': attachMaizeDispatchesEvents(); break;
     case 'personnel': attachPersonnelEvents(); break;
     case 'accounts': attachAccountsEvents(); break;
     case 'labor-payments': attachLaborPaymentsEvents(); break;
     case 'depots': attachDepotsEvents(); break;
     case 'reports': attachReportsEvents(); break;
+    case 'settings': attachSettingsEvents(); break;
   }
 }
 
@@ -1676,11 +1697,23 @@ function renderDashboard(){
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      ${kpiCard('Maize Balance', fmtNum(maizeBalance.balanceKg)+' kg', `Purchased: ${fmtNum(maizeBalance.totalPurchasedKg)} kg | Cost: ZMW ${fmtNum(maizeBalance.totalPurchaseCost)}`, 'bg-emerald-100 text-emerald-600', iconWheat())}
+      ${kpiCard('Maize Balance', `${fmtNum(maizeBalance.balanceKg)} kg`, `${fmtBags(maizeBalance.balanceKg)} bags | Purchased: ${fmtBags(maizeBalance.totalPurchasedKg)} bags | Cost: ZMW ${fmtNum(maizeBalance.totalPurchaseCost)}`, 'bg-emerald-100 text-emerald-600', iconWheat())}
       ${kpiCard('Total Stock Items', stockBalances.length, `${stockBalances.filter(s=>s.balance>0).length} items with stock`, 'bg-amber-100 text-amber-600', iconCart())}
       ${state.user.role==='MANAGER' ? kpiCard('Active Personnel', activePersonnel.length, `Labor cost this month: ZMW ${fmtNum(laborThisMonth)}`, 'bg-sky-100 text-sky-600', iconUsers()) : ''}
-      ${kpiCard('Maize Dispatched', fmtNum(maizeBalance.totalDispatchedKg)+' kg', 'To Main Depot', 'bg-rose-100 text-rose-600', iconTruck())}
+      ${kpiCard('Maize Dispatched', `${fmtNum(maizeBalance.totalDispatchedKg)} kg`, `${fmtBags(maizeBalance.totalDispatchedKg)} bags | To Main Depot`, 'bg-rose-100 text-rose-600', iconTruck())}
     </div>
+
+    ${state.user.role==='MANAGER' ? `
+    <div class="card p-4">
+      <h3 class="text-base font-semibold mb-3">Personnel Summary</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        ${['SDC','GUARD','LOADER','STITCHER'].map(role=>{
+          const count = state.personnel.filter(p=>p.role===role && p.isActive).length;
+          const labelMap = { SDC:'SDC Clerks', GUARD:'Guards', LOADER:'Loaders', STITCHER:'Stitchers' };
+          return `<div class="rounded-lg bg-gray-50 p-3 text-center"><p class="text-xs text-gray-500">${labelMap[role]}</p><p class="text-xl font-bold mt-1">${count}</p></div>`;
+        }).join('')}
+      </div>
+    </div>` : ''}
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div class="card p-4">
@@ -1718,15 +1751,17 @@ function renderDashboard(){
         <div class="rounded-lg bg-emerald-50 p-4 text-center">
           <p class="text-xs text-gray-500 mb-1">Total Purchased</p>
           <p class="text-xl font-bold text-emerald-800">${fmtNum(maizeBalance.totalPurchasedKg)} kg</p>
+          <p class="text-xs text-gray-500 mt-1">${fmtBags(maizeBalance.totalPurchasedKg)} bags</p>
         </div>
         <div class="rounded-lg bg-rose-50 p-4 text-center">
           <p class="text-xs text-gray-500 mb-1">Total Dispatched</p>
           <p class="text-xl font-bold text-rose-800">${fmtNum(maizeBalance.totalDispatchedKg)} kg</p>
+          <p class="text-xs text-gray-500 mt-1">${fmtBags(maizeBalance.totalDispatchedKg)} bags</p>
         </div>
         <div class="rounded-lg bg-amber-50 p-4 text-center">
           <p class="text-xs text-gray-500 mb-1">Current Balance</p>
           <p class="text-xl font-bold text-amber-800">${fmtNum(maizeBalance.balanceKg)} kg</p>
-          <p class="text-xs text-gray-500 mt-1">Total Cost: ZMW ${fmtNum(maizeBalance.totalPurchaseCost)}</p>
+          <p class="text-xs text-gray-500 mt-1">${fmtBags(maizeBalance.balanceKg)} bags | Total Cost: ZMW ${fmtNum(maizeBalance.totalPurchaseCost)}</p>
         </div>
       </div>
     </div>
@@ -1755,11 +1790,11 @@ function renderDashboard(){
             <div class="flex items-center justify-between py-1.5 border-b last:border-0">
               <div class="min-w-0">
                 <p class="text-sm font-medium">${esc(d.destination)}</p>
-                ${d.waybillNumber ? `<p class="text-xs text-gray-400">WB: ${esc(d.waybillNumber)}</p>` : ''}
+                ${d.idtIptNumber ? `<p class="text-xs text-gray-400">IDT/IPT: ${esc(d.idtIptNumber)}</p>` : ''}
               </div>
               <div class="text-right shrink-0 ml-2">
                 <p class="text-sm font-medium">${fmtNum(d.quantityKg)} kg</p>
-                <p class="text-xs text-gray-400">${fmtDate(d.date)}</p>
+                <p class="text-xs text-gray-400">${fmtBags(d.quantityKg)} bags · ${fmtDate(d.date)}</p>
               </div>
             </div>`).join('')}
         </div>
@@ -1813,6 +1848,33 @@ function attachDashboardEvents(){
       options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
     });
   }
+}
+
+/* ========================= STOCK & DISPATCHES (combined) ========================= */
+let stockOpsTab = 'movement'; // 'movement' | 'dispatches'
+
+function renderStockOps(){
+  return `
+  <div class="space-y-4">
+    <div class="flex gap-2 border-b border-gray-200">
+      <button class="px-3 py-2 text-sm font-medium border-b-2 ${stockOpsTab==='movement'?'border-emerald-600 text-emerald-700':'border-transparent text-gray-500'}" data-stock-ops-tab="movement">Stock Movement</button>
+      <button class="px-3 py-2 text-sm font-medium border-b-2 ${stockOpsTab==='dispatches'?'border-emerald-600 text-emerald-700':'border-transparent text-gray-500'}" data-stock-ops-tab="dispatches">Maize Dispatches</button>
+    </div>
+    ${stockOpsTab==='movement' ? renderStockMovement() : renderMaizeDispatches()}
+  </div>`;
+}
+
+function attachStockOpsEvents(){
+  document.querySelectorAll('[data-stock-ops-tab]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const tab = el.dataset.stockOpsTab;
+      if (tab === stockOpsTab) return;
+      stockOpsTab = tab;
+      renderPageAfterFetch();
+    });
+  });
+  if (stockOpsTab === 'movement') attachStockMovementEvents();
+  else attachMaizeDispatchesEvents();
 }
 
 /* ============================ STOCK MOVEMENT ============================ */
@@ -1902,7 +1964,13 @@ function stockMovementModal(){
               const bal = computeStockBalances().find(b=>b.stockItemId===i.id);
               return `<option value="${i.id}">${esc(i.name)} (Bal: ${bal?bal.balance:0} ${esc(i.unit)})</option>`;
             }).join('')}
+            <option value="__new__">+ Add new item...</option>
           </select>
+          <div id="m-new-item-box" class="hidden mt-2 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+            <div><label class="label">New Item Name *</label><input class="input" id="m-new-item-name" placeholder="e.g. Poly Bags"></div>
+            <div><label class="label">Unit *</label><input class="input" id="m-new-item-unit" placeholder="e.g. pieces, kg, bags"></div>
+            <button type="button" class="btn btn-outline text-xs py-1.5" id="m-new-item-save">Save Item</button>
+          </div>
         </div>
         <div>
           <label class="label">Movement Type *</label>
@@ -1932,12 +2000,39 @@ function attachStockMovementEvents(){
   document.getElementById('new-movement-btn').addEventListener('click', ()=>{
     document.getElementById('modal-root').innerHTML = stockMovementModal();
     bindModalClose();
+    const itemSelect = document.getElementById('m-item');
+    const newItemBox = document.getElementById('m-new-item-box');
+    itemSelect.addEventListener('change', ()=>{
+      newItemBox.classList.toggle('hidden', itemSelect.value !== '__new__');
+    });
+    document.getElementById('m-new-item-save').addEventListener('click', async ()=>{
+      const name = document.getElementById('m-new-item-name').value.trim();
+      const unit = document.getElementById('m-new-item-unit').value.trim();
+      if (!name || !unit){ toast('Please enter a name and unit for the new item','error'); return; }
+      const saveBtn = document.getElementById('m-new-item-save');
+      saveBtn.disabled = true; saveBtn.textContent = 'Saving...';
+      try{
+        const ref = await db.collection('stockItems').add({
+          name, unit, depotId: state.currentDepotId,
+          createdById: state.user.id, createdByName: state.user.name,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        state.stockItems.push({ id: ref.id, name, unit, depotId: state.currentDepotId });
+        const opt = document.createElement('option');
+        opt.value = ref.id; opt.textContent = `${name} (Bal: 0 ${unit})`;
+        itemSelect.insertBefore(opt, itemSelect.querySelector('option[value="__new__"]'));
+        itemSelect.value = ref.id;
+        newItemBox.classList.add('hidden');
+        toast(`Item "${name}" added`);
+      } catch(err){ toast('Failed to add item: '+err.message,'error'); }
+      saveBtn.disabled = false; saveBtn.textContent = 'Save Item';
+    });
     document.getElementById('movement-form').addEventListener('submit', async (e)=>{
       e.preventDefault();
       const stockItemId = document.getElementById('m-item').value;
       const type = document.getElementById('m-type').value;
       const quantity = Number(document.getElementById('m-qty').value);
-      if (!stockItemId || !quantity || quantity<=0){ toast('Please fill all required fields','error'); return; }
+      if (!stockItemId || stockItemId==='__new__' || !quantity || quantity<=0){ toast(stockItemId==='__new__' ? 'Please save the new item first, or select an existing one' : 'Please fill all required fields','error'); return; }
       const btn = document.getElementById('modal-submit');
       btn.disabled = true; btn.textContent = 'Saving...';
       try{
@@ -1973,6 +2068,7 @@ function closeModal(){ document.getElementById('modal-root').innerHTML = ''; }
 function renderMaizePurchases(){
   const grandTotal = state.maizePurchases.reduce((s,p)=>s+p.quantityKg,0);
   const grandCost = state.maizePurchases.reduce((s,p)=>s+p.totalCost,0);
+  const lastPrcn = lastPrcnToday();
   return `
   <div class="space-y-6">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1982,23 +2078,26 @@ function renderMaizePurchases(){
         <button id="new-purchase-btn" class="btn btn-primary">${iconPlus()} New Purchase</button>
       </div>
     </div>
-    <div class="grid grid-cols-2 gap-3">
-      <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Total Purchased</p><p class="text-2xl font-bold mt-1">${fmtNum(grandTotal)} kg</p></div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Total Purchased</p><p class="text-2xl font-bold mt-1">${fmtNum(grandTotal)} kg</p><p class="text-xs text-gray-500 mt-1">${fmtBags(grandTotal)} bags</p></div>
       <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Total Investment</p><p class="text-2xl font-bold mt-1">ZMW ${fmtNum(grandCost)}</p></div>
+      <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Last PRCN# Today</p><p class="text-2xl font-bold mt-1">${lastPrcn ? esc(lastPrcn) : '-'}</p><p class="text-xs text-gray-500 mt-1">Produce Receipt &amp; Certification Note</p></div>
     </div>
     <div class="card p-4">
       <h3 class="text-base font-semibold mb-3">Purchase Records</h3>
       <div class="overflow-x-auto">
         <table class="datatable">
-          <thead><tr><th>Date</th><th>Supplier</th><th class="text-right">Qty (kg)</th><th class="text-right">Price/kg</th><th class="text-right">Total</th><th>GRN</th><th>By</th></tr></thead>
+          <thead><tr><th>Date</th><th>Supplier</th><th class="text-right">Bags</th><th class="text-right">Qty (kg)</th><th class="text-right">Price/kg</th><th class="text-right">Total</th><th>PRCN#</th><th>GRN</th><th>By</th></tr></thead>
           <tbody>
-            ${state.maizePurchases.length===0 ? '<tr><td colspan="7" class="text-center py-8 text-gray-400">No purchases recorded yet</td></tr>' : state.maizePurchases.map(p=>`
+            ${state.maizePurchases.length===0 ? '<tr><td colspan="9" class="text-center py-8 text-gray-400">No purchases recorded yet</td></tr>' : state.maizePurchases.map(p=>`
               <tr>
                 <td class="text-xs">${fmtDate(p.date)}</td>
                 <td class="font-medium">${esc(p.supplier)}</td>
+                <td class="text-right">${fmtBags(p.quantityKg)}</td>
                 <td class="text-right font-semibold">${fmtNum(p.quantityKg)}</td>
                 <td class="text-right text-gray-500">${Number(p.pricePerKg).toFixed(2)}</td>
                 <td class="text-right font-semibold">ZMW ${fmtNum(p.totalCost)}</td>
+                <td class="text-xs">${p.prcnNumber ? `<span class="badge border border-gray-300 text-gray-700">${esc(p.prcnNumber)}</span>` : '-'}</td>
                 <td class="text-xs">${p.grnNumber ? `<span class="badge border border-gray-300 text-gray-700">${esc(p.grnNumber)}</span>` : '-'}</td>
                 <td class="text-xs">${esc(p.createdByName)||'-'}</td>
               </tr>`).join('')}
@@ -2018,17 +2117,20 @@ function maizePurchaseModal(){
       <form id="purchase-form" class="space-y-4">
         <div><label class="label">Supplier *</label><input class="input" id="p-supplier" placeholder="Supplier name" required></div>
         <div class="grid grid-cols-2 gap-3">
-          <div><label class="label">Quantity (kg) *</label><input class="input" type="number" min="0" step="0.1" id="p-qty" required></div>
-          <div><label class="label">Price per kg (ZMW) *</label><input class="input" type="number" min="0" step="0.01" id="p-price" required></div>
+          <div><label class="label">Quantity (Bags) *</label><input class="input" type="number" min="0" step="0.1" id="p-bags" required></div>
+          <div><label class="label">Quantity (kg)</label><input class="input" type="number" min="0" step="0.1" id="p-qty" required></div>
         </div>
+        <p class="text-xs text-gray-400 -mt-2">1 bag = ${KG_PER_BAG}kg. Enter either field - the other fills in automatically.</p>
+        <div><label class="label">Price per kg (ZMW) *</label><input class="input" type="number" min="0" step="0.01" id="p-price" required></div>
         <div class="rounded-lg bg-gray-50 p-3 flex justify-between text-sm">
           <span class="text-gray-500">Total Cost:</span>
           <span class="font-bold" id="p-total">ZMW 0</span>
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div><label class="label">Date *</label><input class="input" type="date" id="p-date" value="${todayStr()}" required></div>
-          <div><label class="label">GRN Number</label><input class="input" id="p-grn" placeholder="GRN-XXX"></div>
+          <div><label class="label">PRCN Number</label><input class="input" id="p-prcn" placeholder="PRCN-XXX"></div>
         </div>
+        <div><label class="label">GRN Number</label><input class="input" id="p-grn" placeholder="GRN-XXX"></div>
         <div><label class="label">Notes</label><textarea class="input" id="p-notes" rows="2" placeholder="Optional..."></textarea></div>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
@@ -2044,27 +2146,32 @@ function attachMaizePurchasesEvents(){
   document.getElementById('new-purchase-btn').addEventListener('click', ()=>{
     document.getElementById('modal-root').innerHTML = maizePurchaseModal();
     bindModalClose();
-    const qtyEl = document.getElementById('p-qty'), priceEl = document.getElementById('p-price'), totalEl = document.getElementById('p-total');
+    const qtyEl = document.getElementById('p-qty'), bagsEl = document.getElementById('p-bags'), priceEl = document.getElementById('p-price'), totalEl = document.getElementById('p-total');
     const updateTotal = ()=>{ totalEl.textContent = 'ZMW ' + ((Number(qtyEl.value)||0) * (Number(priceEl.value)||0)).toLocaleString(); };
-    qtyEl.addEventListener('input', updateTotal); priceEl.addEventListener('input', updateTotal);
+    let syncing = false;
+    bagsEl.addEventListener('input', ()=>{ if (syncing) return; syncing=true; qtyEl.value = ((Number(bagsEl.value)||0) * KG_PER_BAG).toString(); syncing=false; updateTotal(); });
+    qtyEl.addEventListener('input', ()=>{ if (syncing) return; syncing=true; bagsEl.value = kgToBags(Number(qtyEl.value)||0).toString(); syncing=false; updateTotal(); });
+    priceEl.addEventListener('input', updateTotal);
     document.getElementById('purchase-form').addEventListener('submit', async (e)=>{
       e.preventDefault();
       const supplier = document.getElementById('p-supplier').value.trim();
       const quantityKg = Number(qtyEl.value);
+      const quantityBags = Number(bagsEl.value) || kgToBags(quantityKg);
       const pricePerKg = Number(priceEl.value);
       if (!supplier || !quantityKg || quantityKg<=0 || !pricePerKg){ toast('Please fill all required fields','error'); return; }
       const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
       try{
         await db.collection('maizePurchases').add({
           date: document.getElementById('p-date').value,
-          supplier, quantityKg, pricePerKg, totalCost: quantityKg*pricePerKg,
+          supplier, quantityKg, quantityBags, pricePerKg, totalCost: quantityKg*pricePerKg,
+          prcnNumber: document.getElementById('p-prcn').value || null,
           grnNumber: document.getElementById('p-grn').value || null,
           notes: document.getElementById('p-notes').value || null,
           depotId: state.currentDepotId,
           createdById: state.user.id, createdByName: state.user.name,
           createdAt: FieldValue.serverTimestamp(),
         });
-        toast(`Purchase of ${quantityKg} kg from ${supplier} recorded`);
+        toast(`Purchase of ${quantityKg} kg (${quantityBags} bags) from ${supplier} recorded`);
         closeModal();
         await refreshCurrentPage();
       } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Save Purchase'; }
@@ -2084,21 +2191,22 @@ function renderMaizeDispatches(){
         <button id="new-dispatch-btn" class="btn btn-primary">${iconPlus()} New Dispatch</button>
       </div>
     </div>
-    <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Total Dispatched</p><p class="text-2xl font-bold mt-1">${fmtNum(totalDispatched)} kg</p></div>
+    <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Total Dispatched</p><p class="text-2xl font-bold mt-1">${fmtNum(totalDispatched)} kg</p><p class="text-xs text-gray-500 mt-1">${fmtBags(totalDispatched)} bags</p></div>
     <div class="card p-4">
       <h3 class="text-base font-semibold mb-3">Dispatch Records</h3>
       <div class="overflow-x-auto">
         <table class="datatable">
-          <thead><tr><th>Date</th><th class="text-right">Qty (kg)</th><th>Destination</th><th>Vehicle</th><th>Driver</th><th>Waybill</th><th>By</th></tr></thead>
+          <thead><tr><th>Date</th><th class="text-right">Bags</th><th class="text-right">Qty (kg)</th><th>Destination</th><th>Vehicle</th><th>Driver</th><th>IDT/IPT Number</th><th>By</th></tr></thead>
           <tbody>
-            ${state.maizeDispatches.length===0 ? '<tr><td colspan="7" class="text-center py-8 text-gray-400">No dispatches recorded yet</td></tr>' : state.maizeDispatches.map(d=>`
+            ${state.maizeDispatches.length===0 ? '<tr><td colspan="8" class="text-center py-8 text-gray-400">No dispatches recorded yet</td></tr>' : state.maizeDispatches.map(d=>`
               <tr>
                 <td class="text-xs">${fmtDate(d.date)}</td>
+                <td class="text-right">${fmtBags(d.quantityKg)}</td>
                 <td class="text-right font-semibold">${fmtNum(d.quantityKg)}</td>
                 <td class="font-medium">${esc(d.destination)}</td>
                 <td class="text-xs">${esc(d.vehicleReg)||'-'}</td>
                 <td class="text-xs">${esc(d.driverName)||'-'}</td>
-                <td class="text-xs">${d.waybillNumber ? `<span class="badge border border-gray-300 text-gray-700">${esc(d.waybillNumber)}</span>`:'-'}</td>
+                <td class="text-xs">${d.idtIptNumber ? `<span class="badge border border-gray-300 text-gray-700">${esc(d.idtIptNumber)}</span>`:'-'}</td>
                 <td class="text-xs">${esc(d.createdByName)||'-'}</td>
               </tr>`).join('')}
           </tbody>
@@ -2123,15 +2231,17 @@ function maizeDispatchModal(){
           </select>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <div><label class="label">Quantity (kg) *</label><input class="input" type="number" min="0" step="0.1" id="d-qty" required></div>
-          <div><label class="label">Date *</label><input class="input" type="date" id="d-date" value="${todayStr()}" required></div>
+          <div><label class="label">Quantity (Bags) *</label><input class="input" type="number" min="0" step="0.1" id="d-bags" required></div>
+          <div><label class="label">Quantity (kg)</label><input class="input" type="number" min="0" step="0.1" id="d-qty" required></div>
         </div>
+        <p class="text-xs text-gray-400 -mt-2">1 bag = ${KG_PER_BAG}kg. Enter either field - the other fills in automatically.</p>
+        <div><label class="label">Date *</label><input class="input" type="date" id="d-date" value="${todayStr()}" required></div>
         <div><label class="label">Destination</label><input class="input" id="d-dest" value="Main Depot"></div>
         <div class="grid grid-cols-2 gap-3">
           <div><label class="label">Vehicle Reg</label><input class="input" id="d-vehicle" placeholder="e.g. AB 1234"></div>
           <div><label class="label">Driver Name</label><input class="input" id="d-driver" placeholder="Driver name"></div>
         </div>
-        <div><label class="label">Waybill Number</label><input class="input" id="d-waybill" placeholder="WB-XXX"></div>
+        <div><label class="label">IDT/IPT Number</label><input class="input" id="d-idtipt" placeholder="IDT-XXX / IPT-XXX"></div>
         <div><label class="label">Notes</label><textarea class="input" id="d-notes" rows="2" placeholder="Optional..."></textarea></div>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
@@ -2147,9 +2257,14 @@ function attachMaizeDispatchesEvents(){
   document.getElementById('new-dispatch-btn').addEventListener('click', ()=>{
     document.getElementById('modal-root').innerHTML = maizeDispatchModal();
     bindModalClose();
+    const dQtyEl = document.getElementById('d-qty'), dBagsEl = document.getElementById('d-bags');
+    let dSyncing = false;
+    dBagsEl.addEventListener('input', ()=>{ if (dSyncing) return; dSyncing=true; dQtyEl.value = ((Number(dBagsEl.value)||0) * KG_PER_BAG).toString(); dSyncing=false; });
+    dQtyEl.addEventListener('input', ()=>{ if (dSyncing) return; dSyncing=true; dBagsEl.value = kgToBags(Number(dQtyEl.value)||0).toString(); dSyncing=false; });
     document.getElementById('dispatch-form').addEventListener('submit', async (e)=>{
       e.preventDefault();
-      const quantityKg = Number(document.getElementById('d-qty').value);
+      const quantityKg = Number(dQtyEl.value);
+      const quantityBags = Number(dBagsEl.value) || kgToBags(quantityKg);
       if (!quantityKg || quantityKg<=0){ toast('Please enter a valid quantity','error'); return; }
       const destination = document.getElementById('d-dest').value || 'Main Depot';
       const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
@@ -2157,16 +2272,16 @@ function attachMaizeDispatchesEvents(){
         await db.collection('maizeDispatches').add({
           purchaseId: document.getElementById('d-purchase').value || null,
           date: document.getElementById('d-date').value,
-          quantityKg, destination,
+          quantityKg, quantityBags, destination,
           vehicleReg: document.getElementById('d-vehicle').value || null,
           driverName: document.getElementById('d-driver').value || null,
-          waybillNumber: document.getElementById('d-waybill').value || null,
+          idtIptNumber: document.getElementById('d-idtipt').value || null,
           notes: document.getElementById('d-notes').value || null,
           depotId: state.currentDepotId,
           createdById: state.user.id, createdByName: state.user.name,
           createdAt: FieldValue.serverTimestamp(),
         });
-        toast(`Dispatch of ${quantityKg} kg to ${destination} recorded`);
+        toast(`Dispatch of ${quantityKg} kg (${quantityBags} bags) to ${destination} recorded`);
         closeModal();
         await refreshCurrentPage();
       } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Save Dispatch'; }
@@ -2613,7 +2728,7 @@ function generateReportText(){
     text += `*RECENT MAIZE DISPATCHES*\n`;
     for (const dp of state.maizeDispatches.slice(0,5)){
       text += `  ${fmtDate(dp.date)} | ${fmtNum(dp.quantityKg)}kg to ${dp.destination}`;
-      if (dp.waybillNumber) text += ` | WB: ${dp.waybillNumber}`;
+      if (dp.idtIptNumber) text += ` | IDT/IPT: ${dp.idtIptNumber}`;
       text += `\n`;
     }
     text += `\n`;
@@ -2669,6 +2784,109 @@ function attachReportsEvents(){
       await navigator.clipboard.writeText(generateReportText());
       toast('Report copied to clipboard');
     } catch(err){ toast('Failed to copy','error'); }
+  });
+}
+
+/* ================================ SETTINGS ================================ */
+function renderSettings(){
+  return `
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div><h2 class="text-2xl font-bold">Settings</h2><p class="text-sm text-gray-500">Manage the stock item catalog used across Stock Movement and other forms.</p></div>
+      <button id="new-catalog-item-btn" class="btn btn-primary">${iconPlus()} New Item</button>
+    </div>
+    <div class="card p-4">
+      <h3 class="text-base font-semibold mb-3">Stock Item Catalog</h3>
+      <div class="overflow-x-auto">
+        <table class="datatable">
+          <thead><tr><th>Name</th><th>Unit</th><th class="text-right">Actions</th></tr></thead>
+          <tbody>
+            ${state.stockItems.length===0 ? '<tr><td colspan="3" class="text-center py-8 text-gray-400">No stock items yet</td></tr>' : state.stockItems.map(i=>`
+              <tr>
+                <td class="font-medium">${esc(i.name)}</td>
+                <td class="text-xs text-gray-500">${esc(i.unit)}</td>
+                <td class="text-right">
+                  <button class="text-xs text-emerald-700 hover:underline edit-catalog-item-btn" data-id="${i.id}" data-name="${esc(i.name)}" data-unit="${esc(i.unit)}">Edit</button>
+                  <button class="text-xs text-red-600 hover:underline ml-2 delete-catalog-item-btn" data-id="${i.id}" data-name="${esc(i.name)}">Remove</button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function catalogItemModal(existing){
+  const isEdit = !!existing;
+  return `
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold mb-1">${isEdit ? 'Edit Item' : 'New Stock Item'}</h3>
+      <p class="text-sm text-gray-500 mb-4">${isEdit ? 'Update this item\'s name or unit.' : 'Add a new item to the stock catalog.'}</p>
+      <form id="catalog-item-form" class="space-y-4">
+        <div><label class="label">Item Name *</label><input class="input" id="ci-name" value="${isEdit?esc(existing.name):''}" placeholder="e.g. Poly Bags" required></div>
+        <div><label class="label">Unit *</label><input class="input" id="ci-unit" value="${isEdit?esc(existing.unit):''}" placeholder="e.g. pieces, kg, bags" required></div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-submit">${isEdit ? 'Save Changes' : 'Add Item'}</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
+function attachSettingsEvents(){
+  const newBtn = document.getElementById('new-catalog-item-btn');
+  if (newBtn) newBtn.addEventListener('click', ()=>{
+    document.getElementById('modal-root').innerHTML = catalogItemModal(null);
+    bindModalClose();
+    document.getElementById('catalog-item-form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const name = document.getElementById('ci-name').value.trim();
+      const unit = document.getElementById('ci-unit').value.trim();
+      if (!name || !unit){ toast('Please fill all required fields','error'); return; }
+      const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
+      try{
+        await db.collection('stockItems').add({
+          name, unit, depotId: state.currentDepotId,
+          createdById: state.user.id, createdByName: state.user.name,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        toast(`Item "${name}" added`);
+        closeModal();
+        await refreshCurrentPage();
+      } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Add Item'; }
+    });
+  });
+  document.querySelectorAll('.edit-catalog-item-btn').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      document.getElementById('modal-root').innerHTML = catalogItemModal({ id: el.dataset.id, name: el.dataset.name, unit: el.dataset.unit });
+      bindModalClose();
+      document.getElementById('catalog-item-form').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const name = document.getElementById('ci-name').value.trim();
+        const unit = document.getElementById('ci-unit').value.trim();
+        if (!name || !unit){ toast('Please fill all required fields','error'); return; }
+        const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
+        try{
+          await db.collection('stockItems').doc(el.dataset.id).update({ name, unit });
+          toast('Item updated');
+          closeModal();
+          await refreshCurrentPage();
+        } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Save Changes'; }
+      });
+    });
+  });
+  document.querySelectorAll('.delete-catalog-item-btn').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      if (!confirm(`Remove "${el.dataset.name}" from the stock catalog? Existing transaction history for this item is kept.`)) return;
+      try{
+        await db.collection('stockItems').doc(el.dataset.id).update({ deleted: true, deletedAt: FieldValue.serverTimestamp() });
+        toast('Item removed');
+        await refreshCurrentPage();
+      } catch(err){ toast('Failed: '+err.message,'error'); }
+    });
   });
 }
 
