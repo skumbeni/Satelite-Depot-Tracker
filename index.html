@@ -317,7 +317,7 @@ class RTDBClient {
     this.baseUrl = (config.databaseURL || '').replace(/\/$/, '');
     this.getAuthToken = getAuthToken;
   }
-  async _fetch(path, method='GET', body, timeoutMs=15000){
+  async _fetch(path, method='GET', body, timeoutMs=25000){
     // Both the auth-token fetch and the RTDB request itself are plain
     // network calls with no built-in timeout - on a flaky mobile connection
     // they can hang indefinitely, leaving buttons stuck on "Creating..."/
@@ -823,21 +823,30 @@ function startRealtimeSync(){
         if (pending === 0){ state.dataReady = true; state.loading = false; resolve(); }
       }
     };
-    SYNC_COLLECTIONS.forEach(c=>{
-      let q = db.collection(c.name).where('depotId','==',state.currentDepotId);
-      q = c.desc ? q.orderBy(c.orderField,'desc') : q.orderBy(c.orderField);
-      const unsub = q.onSnapshot(snap=>{
-        state[c.stateKey] = snap.docs.map(d=>({id:d.id, ...d.data()}));
-        markReceived();
-        // Live-refresh whatever the signed-in user is currently looking at,
-        // so changes made on another device/account appear without reload.
-        if (state.user && state.dataReady) renderPageAfterFetch();
-      }, err=>{
-        console.error(`Sync error on ${c.name}:`, err);
-        toast(`Live sync error (${c.name}): ` + err.message, 'error');
-        markReceived();
-      });
-      state.listeners.push(unsub);
+    // Each collection's onSnapshot opens TWO connections at once (an initial
+    // fetch + a long-lived SSE stream). Firing all of these in the same tick
+    // can exceed the browser's per-host connection cap (especially on mobile
+    // carrier networks that force HTTP/1.1's 6-connection limit), leaving
+    // later requests queued behind the never-closing SSE streams until they
+    // hit the client-side timeout - even though the network itself is fine.
+    // Staggering the startup by a beat per collection avoids that pile-up.
+    SYNC_COLLECTIONS.forEach((c, i)=>{
+      setTimeout(()=>{
+        let q = db.collection(c.name).where('depotId','==',state.currentDepotId);
+        q = c.desc ? q.orderBy(c.orderField,'desc') : q.orderBy(c.orderField);
+        const unsub = q.onSnapshot(snap=>{
+          state[c.stateKey] = snap.docs.map(d=>({id:d.id, ...d.data()}));
+          markReceived();
+          // Live-refresh whatever the signed-in user is currently looking at,
+          // so changes made on another device/account appear without reload.
+          if (state.user && state.dataReady) renderPageAfterFetch();
+        }, err=>{
+          console.error(`Sync error on ${c.name}:`, err);
+          toast(`Live sync error (${c.name}): ` + err.message, 'error');
+          markReceived();
+        });
+        state.listeners.push(unsub);
+      }, i * 150);
     });
     // SDC login accounts (Manager-only "SDC Accounts" page) live-sync the
     // same way as every other collection above, rather than the one-off
@@ -845,17 +854,19 @@ function startRealtimeSync(){
     // that manual round-trip was the only thing making the Accounts tab
     // noticeably slower to open than any other tab.
     if (isManager) {
-      const q = db.collection('users').where('ownerUsername','==',state.user.username);
-      const unsub = q.onSnapshot(snap=>{
-        state.sdcAccounts = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(u=>u.role==='SDC' && !u.deleted);
-        markReceived();
-        if (state.user && state.dataReady) renderPageAfterFetch();
-      }, err=>{
-        console.error('Sync error on users (sdcAccounts):', err);
-        toast('Live sync error (SDC accounts): ' + err.message, 'error');
-        markReceived();
-      });
-      state.listeners.push(unsub);
+      setTimeout(()=>{
+        const q = db.collection('users').where('ownerUsername','==',state.user.username);
+        const unsub = q.onSnapshot(snap=>{
+          state.sdcAccounts = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(u=>u.role==='SDC' && !u.deleted);
+          markReceived();
+          if (state.user && state.dataReady) renderPageAfterFetch();
+        }, err=>{
+          console.error('Sync error on users (sdcAccounts):', err);
+          toast('Live sync error (SDC accounts): ' + err.message, 'error');
+          markReceived();
+        });
+        state.listeners.push(unsub);
+      }, SYNC_COLLECTIONS.length * 150);
     }
   });
 }
