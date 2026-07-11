@@ -317,17 +317,35 @@ class RTDBClient {
     this.baseUrl = (config.databaseURL || '').replace(/\/$/, '');
     this.getAuthToken = getAuthToken;
   }
-  async _fetch(path, method='GET', body){
-    const token = await this.getAuthToken();
-    const url = `${this.baseUrl}/${path}.json` + (token ? `?auth=${token}` : '');
-    const opts = { method };
-    if (body !== undefined) opts.body = JSON.stringify(body);
-    const res = await fetch(url, opts);
-    if (!res.ok) {
-      const text = await res.text().catch(()=> '');
-      throw new Error(`Realtime Database ${method} ${path} failed (${res.status}): ${text}`);
+  async _fetch(path, method='GET', body, timeoutMs=15000){
+    // Both the auth-token fetch and the RTDB request itself are plain
+    // network calls with no built-in timeout - on a flaky mobile connection
+    // they can hang indefinitely, leaving buttons stuck on "Creating..."/
+    // "Checking availability..." forever with no error ever surfacing.
+    // Wrap the whole thing in one watchdog timer so a stalled request always
+    // fails fast with a clear, catchable error instead of hanging the UI.
+    const controller = new AbortController();
+    const timer = setTimeout(()=> controller.abort(), timeoutMs);
+    try {
+      const token = await Promise.race([
+        this.getAuthToken(),
+        new Promise((_, rej)=> setTimeout(()=> rej(new Error('Timed out getting auth token - check your connection.')), timeoutMs))
+      ]);
+      const url = `${this.baseUrl}/${path}.json` + (token ? `?auth=${token}` : '');
+      const opts = { method, signal: controller.signal };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const res = await fetch(url, opts);
+      if (!res.ok) {
+        const text = await res.text().catch(()=> '');
+        throw new Error(`Realtime Database ${method} ${path} failed (${res.status}): ${text}`);
+      }
+      return res.status === 204 ? null : res.json();
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error('Request timed out - check your internet connection and try again.');
+      throw e;
+    } finally {
+      clearTimeout(timer);
     }
-    return res.status === 204 ? null : res.json();
   }
   async _sse(path, onEvent){
     const token = await this.getAuthToken();
