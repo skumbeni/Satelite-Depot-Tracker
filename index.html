@@ -389,14 +389,28 @@ class RTDBQuery {
     };
   }
   onSnapshot(onNext, onError){
-    let stopped = false, unsubSSE = null;
-    const refetch = async () => {
+    // Each subscription used to open TWO connections at once: an immediate
+    // GET fetch for the initial snapshot, plus a long-lived SSE stream for
+    // live updates. With several collections syncing at once (each SSE
+    // stream never closes), that can exceed the browser's per-host
+    // connection cap - especially on mobile/WebView network stacks still
+    // limited to ~6 connections per host - leaving later collections'
+    // initial fetch queued behind already-open SSE streams until it times
+    // out. Firebase's RTDB SSE stream already delivers the full current
+    // value as its first event on connect, so we lean on that for the
+    // initial snapshot instead of firing a redundant parallel fetch. We
+    // only fall back to a one-off REST fetch if the SSE stream hasn't
+    // delivered anything after a grace period (e.g. it failed silently).
+    let stopped = false, unsubSSE = null, gotFirst = false;
+    const applySnapshot = async () => {
       if (stopped) return;
-      try { onNext(await this.get()); } catch (e) { if (onError) onError(e); }
+      try { onNext(await this.get()); gotFirst = true; } catch (e) { if (onError) onError(e); }
     };
-    refetch();
-    this.client._sse(this.path, refetch).then(unsub => { stopped ? unsub() : (unsubSSE = unsub); });
-    return () => { stopped = true; if (unsubSSE) unsubSSE(); };
+    this.client._sse(this.path, applySnapshot).then(unsub => { stopped ? unsub() : (unsubSSE = unsub); });
+    const fallbackTimer = setTimeout(() => {
+      if (!stopped && !gotFirst) applySnapshot();
+    }, 8000);
+    return () => { stopped = true; clearTimeout(fallbackTimer); if (unsubSSE) unsubSSE(); };
   }
 }
 
