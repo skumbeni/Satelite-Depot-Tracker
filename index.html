@@ -63,9 +63,12 @@
   .badge{display:inline-flex;align-items:center;padding:0.1rem 0.55rem;border-radius:9999px;font-size:0.7rem;font-weight:700;white-space:nowrap;}
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100;padding:1rem;}
   .modal-box{background:#fff;border-radius:0.9rem;max-width:32rem;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;}
-  .toast-wrap{position:fixed;top:1rem;right:1rem;z-index:200;display:flex;flex-direction:column;gap:0.5rem;}
-  .toast{padding:0.75rem 1rem;border-radius:0.6rem;color:#fff;font-size:0.85rem;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.15);animation:slidein .2s ease-out;max-width:320px;}
+  .toast-wrap{position:fixed;top:1rem;right:1rem;left:1rem;z-index:200;display:flex;flex-direction:column;gap:0.5rem;align-items:flex-end;}
+  .toast{padding:0.75rem 0.75rem 0.75rem 1rem;border-radius:0.6rem;color:#fff;font-size:0.85rem;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.15);animation:slidein .2s ease-out;max-width:320px;width:100%;display:flex;align-items:flex-start;gap:0.5rem;}
   @keyframes slidein{from{transform:translateX(20px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+  .toast-text{flex:1;line-height:1.35;}
+  .toast-close{flex:none;background:transparent;border:none;color:inherit;opacity:0.8;font-size:1.1rem;line-height:1;cursor:pointer;padding:0 0.15rem;}
+  .toast-close:hover{opacity:1;}
   .toast.success{background:#047857;}
   .toast.error{background:#dc2626;}
   table.datatable{width:100%;font-size:0.85rem;border-collapse:collapse;}
@@ -317,7 +320,7 @@ class RTDBClient {
     this.baseUrl = (config.databaseURL || '').replace(/\/$/, '');
     this.getAuthToken = getAuthToken;
   }
-  async _fetch(path, method='GET', body, timeoutMs=25000){
+  async _fetch(path, method='GET', body, timeoutMs=25000, query=null){
     // Both the auth-token fetch and the RTDB request itself are plain
     // network calls with no built-in timeout - on a flaky mobile connection
     // they can hang indefinitely, leaving buttons stuck on "Creating..."/
@@ -331,7 +334,10 @@ class RTDBClient {
         this.getAuthToken(),
         new Promise((_, rej)=> setTimeout(()=> rej(new Error('Timed out getting auth token - check your connection.')), timeoutMs))
       ]);
-      const url = `${this.baseUrl}/${path}.json` + (token ? `?auth=${token}` : '');
+      const params = { ...(query || {}) };
+      if (token) params.auth = token;
+      const qs = Object.keys(params).length ? '?' + Object.entries(params).map(([k,v])=>`${k}=${v}`).join('&') : '';
+      const url = `${this.baseUrl}/${path}.json${qs}`;
       const opts = { method, signal: controller.signal };
       if (body !== undefined) opts.body = JSON.stringify(body);
       const res = await fetch(url, opts);
@@ -347,9 +353,12 @@ class RTDBClient {
       clearTimeout(timer);
     }
   }
-  async _sse(path, onEvent){
+  async _sse(path, onEvent, query=null){
     const token = await this.getAuthToken();
-    const url = `${this.baseUrl}/${path}.json` + (token ? `?auth=${token}` : '');
+    const params = { ...(query || {}) };
+    if (token) params.auth = token;
+    const qs = Object.keys(params).length ? '?' + Object.entries(params).map(([k,v])=>`${k}=${v}`).join('&') : '';
+    const url = `${this.baseUrl}/${path}.json${qs}`;
     const es = new EventSource(url);
     es.addEventListener('put', onEvent);
     es.addEventListener('patch', onEvent);
@@ -358,6 +367,14 @@ class RTDBClient {
   }
   collection(name){ return new RTDBCollection(this, name); }
   batch(){ return new RTDBBatch(this); }
+}
+
+// Encodes a JS value the way Firebase RTDB's REST `equalTo`/`startAt` query
+// params expect: quoted strings, bare numbers/booleans, literal null.
+function rtdbRestValue(v){
+  if (v === null || v === undefined) return 'null';
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  return JSON.stringify(String(v));
 }
 
 class RTDBQuery {
@@ -372,9 +389,28 @@ class RTDBQuery {
   where(field, op, value){ this._wheres.push({field, op, value}); return this; }
   orderBy(field, dir){ this._orderField = field; this._desc = (dir === 'desc'); return this; }
   limit(n){ this._limit = n; return this; }
+  // Every `.where()` call in this app is a single equality filter (almost
+  // always `depotId == X`). Previously that filter was applied entirely
+  // client-side: the ENTIRE top-level node (every depot, every manager's
+  // data, across the whole multi-tenant database) was downloaded on every
+  // fetch and every realtime reconnect, then filtered down in the browser.
+  // On a slow/weak mobile connection that payload alone was routinely
+  // blowing past the request timeout - not a connection-count problem, a
+  // "downloading far more data than needed" problem. When the filter is a
+  // single `==`, push it down to RTDB's own `orderBy`/`equalTo` REST
+  // params so the server only ever sends back the matching rows.
+  _restQuery(){
+    if (this._wheres.length !== 1) return null;
+    const w = this._wheres[0];
+    if (w.op !== '==') return null;
+    return { orderBy: JSON.stringify(w.field), equalTo: rtdbRestValue(w.value) };
+  }
   async get(){
-    const raw = await this.client._fetch(this.path) || {};
+    const raw = await this.client._fetch(this.path, 'GET', undefined, undefined, this._restQuery()) || {};
     let docs = Object.keys(raw).map(id => ({ id, data: raw[id] || {} }));
+    // Kept as a safety net (e.g. multiple where() clauses, or if the server
+    // didn't have the index and silently returned the unfiltered node) -
+    // a no-op re-filter when the server already did the work.
     for (const w of this._wheres) {
       docs = docs.filter(d => w.op === '==' ? d.data[w.field] === w.value : true);
     }
@@ -406,7 +442,7 @@ class RTDBQuery {
       if (stopped) return;
       try { onNext(await this.get()); gotFirst = true; } catch (e) { if (onError) onError(e); }
     };
-    this.client._sse(this.path, applySnapshot).then(unsub => { stopped ? unsub() : (unsubSSE = unsub); });
+    this.client._sse(this.path, applySnapshot, this._restQuery()).then(unsub => { stopped ? unsub() : (unsubSSE = unsub); });
     const fallbackTimer = setTimeout(() => {
       if (!stopped && !gotFirst) applySnapshot();
     }, 8000);
@@ -517,11 +553,59 @@ function esc(s){ return (s===null||s===undefined)?'':String(s).replace(/[&<>"']/
 
 function toast(msg, type='success'){
   const wrap = document.getElementById('toast-wrap');
+  // Dedupe: if this exact message is already showing, just restart its timer
+  // instead of stacking a second identical toast on top of it.
+  const dupe = Array.from(wrap.children).find(el => el.dataset.msg === msg);
+  if (dupe) { clearTimeout(dupe._dismissTimer); dupe._dismissTimer = scheduleToastDismiss(dupe, type); return; }
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.textContent = msg;
+  el.dataset.msg = msg;
+  const text = document.createElement('span');
+  text.className = 'toast-text';
+  text.textContent = msg;
+  el.appendChild(text);
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'toast-close';
+  closeBtn.type = 'button';
+  closeBtn.setAttribute('aria-label','Dismiss');
+  closeBtn.textContent = '\u00d7';
+  closeBtn.onclick = () => dismissToastEl(el);
+  el.appendChild(closeBtn);
   wrap.appendChild(el);
-  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, 3200);
+  // Never let more than 4 toasts pile up and cover the screen - drop the
+  // oldest ones first if a burst of errors comes in at once.
+  while (wrap.children.length > 4) dismissToastEl(wrap.firstChild);
+  el._dismissTimer = scheduleToastDismiss(el, type);
+}
+function scheduleToastDismiss(el, type){
+  // Error toasts stay up noticeably longer - they were disappearing before
+  // anyone on a small mobile screen could actually finish reading them.
+  return setTimeout(()=> dismissToastEl(el), type === 'error' ? 7000 : 3200);
+}
+function dismissToastEl(el){
+  if (!el || !el.parentNode) return;
+  clearTimeout(el._dismissTimer);
+  el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300);
+}
+
+// Multiple realtime listeners can all fail at once on a flaky connection
+// (one per collection). Rather than firing a separate toast per collection -
+// which stacks up and covers the whole screen - batch failures that land
+// within a short window into a single, combined toast.
+let __syncErrorBuffer = [];
+let __syncErrorTimer = null;
+function reportSyncError(label, err){
+  console.error(`Sync error on ${label}:`, err);
+  __syncErrorBuffer.push(label);
+  clearTimeout(__syncErrorTimer);
+  __syncErrorTimer = setTimeout(()=>{
+    const labels = [...new Set(__syncErrorBuffer)];
+    __syncErrorBuffer = [];
+    const msg = labels.length > 1
+      ? `Live sync issue on ${labels.length} feeds (${labels.join(', ')}) - check your internet connection.`
+      : `Live sync error (${labels[0]}) - check your internet connection.`;
+    toast(msg, 'error');
+  }, 400);
 }
 
 /* -------------------------------- Icons -------------------------------- */
@@ -855,8 +939,7 @@ function startRealtimeSync(){
           // so changes made on another device/account appear without reload.
           if (state.user && state.dataReady) renderPageAfterFetch();
         }, err=>{
-          console.error(`Sync error on ${c.name}:`, err);
-          toast(`Live sync error (${c.name}): ` + err.message, 'error');
+          reportSyncError(c.name, err);
           markReceived();
         });
         state.listeners.push(unsub);
@@ -875,8 +958,7 @@ function startRealtimeSync(){
           markReceived();
           if (state.user && state.dataReady) renderPageAfterFetch();
         }, err=>{
-          console.error('Sync error on users (sdcAccounts):', err);
-          toast('Live sync error (SDC accounts): ' + err.message, 'error');
+          reportSyncError('SDC accounts', err);
           markReceived();
         });
         state.listeners.push(unsub);
