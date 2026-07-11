@@ -317,23 +317,12 @@ class RTDBClient {
     this.baseUrl = (config.databaseURL || '').replace(/\/$/, '');
     this.getAuthToken = getAuthToken;
   }
-  async _fetch(path, method='GET', body, extraQuery){
+  async _fetch(path, method='GET', body){
     const token = await this.getAuthToken();
-    let url = `${this.baseUrl}/${path}.json` + (token ? `?auth=${token}` : '');
-    if (extraQuery) url += (token ? '&' : '?') + extraQuery;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s: fail loudly instead of spinning forever on a bad connection
-    const opts = { method, signal: controller.signal };
+    const url = `${this.baseUrl}/${path}.json` + (token ? `?auth=${token}` : '');
+    const opts = { method };
     if (body !== undefined) opts.body = JSON.stringify(body);
-    let res;
-    try {
-      res = await fetch(url, opts);
-    } catch (e) {
-      if (e.name === 'AbortError') throw new Error('Request timed out - check your internet connection and try again.');
-      throw e;
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    const res = await fetch(url, opts);
     if (!res.ok) {
       const text = await res.text().catch(()=> '');
       throw new Error(`Realtime Database ${method} ${path} failed (${res.status}): ${text}`);
@@ -366,35 +355,15 @@ class RTDBQuery {
   orderBy(field, dir){ this._orderField = field; this._desc = (dir === 'desc'); return this; }
   limit(n){ this._limit = n; return this; }
   async get(){
-    // When there's exactly one '==' filter (the overwhelmingly common case
-    // in this app), ask the Realtime Database REST API to do the filtering
-    // server-side via orderBy/equalTo, so we only download the matching
-    // rows instead of the entire node. This matters a lot on slow/limited
-    // connections and as collections grow across tenants.
-    // NOTE: for best performance this needs a ".indexOn" rule for the
-    // filtered field at this path in your Firebase Realtime Database rules
-    // (e.g. "users": { ".indexOn": ["username", "ownerUsername"] }).
-    // It will still work correctly without the index, just with a slower
-    // server-side scan and a console warning from Firebase.
-    let raw;
-    const singleEqWhere = (this._wheres.length === 1 && this._wheres[0].op === '==') ? this._wheres[0] : null;
-    if (singleEqWhere) {
-      const q = `orderBy=${encodeURIComponent(JSON.stringify(singleEqWhere.field))}&equalTo=${encodeURIComponent(JSON.stringify(singleEqWhere.value))}`
-        + (this._limit ? `&limitToFirst=${this._limit}` : '');
-      raw = await this.client._fetch(this.path, 'GET', undefined, q) || {};
-    } else {
-      raw = await this.client._fetch(this.path) || {};
-    }
+    const raw = await this.client._fetch(this.path) || {};
     let docs = Object.keys(raw).map(id => ({ id, data: raw[id] || {} }));
-    if (!singleEqWhere) {
-      for (const w of this._wheres) {
-        docs = docs.filter(d => w.op === '==' ? d.data[w.field] === w.value : true);
-      }
+    for (const w of this._wheres) {
+      docs = docs.filter(d => w.op === '==' ? d.data[w.field] === w.value : true);
     }
     if (this._orderField) {
       docs.sort((a,b)=> rtdbCompare(a.data[this._orderField], b.data[this._orderField]) * (this._desc ? -1 : 1));
     }
-    if (this._limit && !singleEqWhere) docs = docs.slice(0, this._limit);
+    if (this._limit) docs = docs.slice(0, this._limit);
     return {
       empty: docs.length === 0,
       size: docs.length,
@@ -653,15 +622,6 @@ async function signup(username, password, name, phone, depotChoice){
    depot is currently selected - which is itself always one of that Manager's
    own tenant's depots.
    ================================================================================ */
-async function loadSdcAccounts(){
-  // Loads every SDC account belonging to this Manager's tenant - not just
-  // the ones scoped to the currently-selected depot - so the page can show
-  // "Unassigned" accounts (depotId removed via reassignSdcDepot) alongside
-  // ones for each depot, and offer a move-to-depot control on all of them.
-  const snap = await db.collection('users').where('ownerUsername','==',state.user.username).get();
-  state.sdcAccounts = snap.docs.map(d=>({ id: d.id, ...d.data() })).filter(u=>u.role==='SDC' && !u.deleted);
-}
-
 // Shared by Manager signup and SDC account creation. Once a username has
 // ever been used, it stays reserved forever - even after the account is
 // later removed - because removal is a soft-delete (see deleteSdcAccount)
@@ -721,7 +681,9 @@ async function createSdcAccount(username, password, name, phone, depotId){
 
   const newUserRef = db.collection('users').doc();
   await newUserRef.set({ username, password, name, role: 'SDC', phone: phone || null, depotId, ownerUsername: state.user.username });
-  await loadSdcAccounts();
+  // state.sdcAccounts updates itself via the live listener in
+  // startRealtimeSync - no manual reload needed, same as every other
+  // collection's create/update/delete path in this file.
   return newUserRef.id;
 }
 
@@ -733,7 +695,6 @@ async function createSdcAccount(username, password, name, phone, depotId){
 // accounts to parity with that.
 async function reassignSdcDepot(userId, depotId){
   await db.collection('users').doc(userId).update({ depotId: depotId || null });
-  await loadSdcAccounts();
 }
 
 async function deleteSdcAccount(userId){
@@ -742,7 +703,6 @@ async function deleteSdcAccount(userId){
   // records that reference this account's id keep meaning what they meant.
   // The account just becomes unable to log in and disappears from the list.
   await db.collection('users').doc(userId).update({ deleted: true, deletedAt: FieldValue.serverTimestamp() });
-  await loadSdcAccounts();
 }
 
 async function createDepot(name, location){
@@ -830,12 +790,14 @@ function startRealtimeSync(){
     // No depot selected yet (e.g. a brand-new Manager with zero depots) -
     // nothing to sync until one exists.
     SYNC_COLLECTIONS.forEach(c=>{ state[c.stateKey] = []; });
+    state.sdcAccounts = [];
     state.dataReady = true;
     state.loading = false;
     return Promise.resolve();
   }
   state.loading = true;
-  let pending = SYNC_COLLECTIONS.length;
+  const isManager = state.user && state.user.role === 'MANAGER';
+  let pending = SYNC_COLLECTIONS.length + (isManager ? 1 : 0);
   return new Promise(resolve=>{
     const markReceived = () => {
       if (pending > 0){
@@ -859,6 +821,24 @@ function startRealtimeSync(){
       });
       state.listeners.push(unsub);
     });
+    // SDC login accounts (Manager-only "SDC Accounts" page) live-sync the
+    // same way as every other collection above, rather than the one-off
+    // fetch this used to do on every single open/refresh of that page -
+    // that manual round-trip was the only thing making the Accounts tab
+    // noticeably slower to open than any other tab.
+    if (isManager) {
+      const q = db.collection('users').where('ownerUsername','==',state.user.username);
+      const unsub = q.onSnapshot(snap=>{
+        state.sdcAccounts = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(u=>u.role==='SDC' && !u.deleted);
+        markReceived();
+        if (state.user && state.dataReady) renderPageAfterFetch();
+      }, err=>{
+        console.error('Sync error on users (sdcAccounts):', err);
+        toast('Live sync error (SDC accounts): ' + err.message, 'error');
+        markReceived();
+      });
+      state.listeners.push(unsub);
+    }
   });
 }
 
@@ -1258,7 +1238,7 @@ async function renderPageContent(){
     case 'maize-purchases': el2.innerHTML = renderMaizePurchases(); attachMaizePurchasesEvents(); break;
     case 'maize-dispatches': el2.innerHTML = renderMaizeDispatches(); attachMaizeDispatchesEvents(); break;
     case 'personnel': el2.innerHTML = renderPersonnel(); attachPersonnelEvents(); break;
-    case 'accounts': await loadSdcAccounts(); el2.innerHTML = renderAccounts(); attachAccountsEvents(); break;
+    case 'accounts': el2.innerHTML = renderAccounts(); attachAccountsEvents(); break;
     case 'labor-payments': el2.innerHTML = renderLaborPayments(); attachLaborPaymentsEvents(); break;
     case 'depots': el2.innerHTML = renderDepots(); attachDepotsEvents(); break;
     case 'reports': el2.innerHTML = renderReports(); attachReportsEvents(); break;
@@ -1283,7 +1263,7 @@ async function renderPageAfterFetch(){
     case 'maize-purchases': el.innerHTML = renderMaizePurchases(); attachMaizePurchasesEvents(); break;
     case 'maize-dispatches': el.innerHTML = renderMaizeDispatches(); attachMaizeDispatchesEvents(); break;
     case 'personnel': el.innerHTML = renderPersonnel(); attachPersonnelEvents(); break;
-    case 'accounts': await loadSdcAccounts(); el.innerHTML = renderAccounts(); attachAccountsEvents(); break;
+    case 'accounts': el.innerHTML = renderAccounts(); attachAccountsEvents(); break;
     case 'labor-payments': el.innerHTML = renderLaborPayments(); attachLaborPaymentsEvents(); break;
     case 'depots': el.innerHTML = renderDepots(); attachDepotsEvents(); break;
     case 'reports': el.innerHTML = renderReports(); attachReportsEvents(); break;
