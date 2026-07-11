@@ -320,7 +320,7 @@ class RTDBClient {
     this.baseUrl = (config.databaseURL || '').replace(/\/$/, '');
     this.getAuthToken = getAuthToken;
   }
-  async _fetch(path, method='GET', body, timeoutMs=25000, query=null){
+  async _fetchOnce(path, method, body, timeoutMs, query){
     // Both the auth-token fetch and the RTDB request itself are plain
     // network calls with no built-in timeout - on a flaky mobile connection
     // they can hang indefinitely, leaving buttons stuck on "Creating..."/
@@ -343,14 +343,40 @@ class RTDBClient {
       const res = await fetch(url, opts);
       if (!res.ok) {
         const text = await res.text().catch(()=> '');
-        throw new Error(`Realtime Database ${method} ${path} failed (${res.status}): ${text}`);
+        const err = new Error(`Realtime Database ${method} ${path} failed (${res.status}): ${text}`);
+        // 4xx means the server understood the request and rejected it (bad
+        // data, no permission, etc) - retrying identical bytes will never
+        // help. 5xx/network-level failures are the server or the connection
+        // having a bad moment, so those are worth retrying.
+        err.retryable = res.status >= 500;
+        throw err;
       }
       return res.status === 204 ? null : res.json();
     } catch (e) {
-      if (e.name === 'AbortError') throw new Error('Request timed out - check your internet connection and try again.');
+      if (e.name === 'AbortError') { const err = new Error('Request timed out - check your internet connection and try again.'); err.retryable = true; throw err; }
+      if (e.retryable === undefined) e.retryable = true; // TypeError "Failed to fetch" etc - a dropped connection, not a real rejection
       throw e;
     } finally {
       clearTimeout(timer);
+    }
+  }
+  async _fetch(path, method='GET', body, timeoutMs=12000, query=null, retries=3){
+    // A single weak-signal blip used to surface immediately as a user-facing
+    // error (a toast, a stuck button) even though the same request would
+    // have gone through fine two seconds later. Retry transient failures a
+    // few times with backoff before giving up - most mobile network drops
+    // are momentary, so this makes them invisible to the user instead of
+    // requiring them to notice the error and manually retry themselves.
+    let attempt = 0;
+    for (;;) {
+      try {
+        return await this._fetchOnce(path, method, body, timeoutMs, query);
+      } catch (e) {
+        if (!e.retryable || attempt >= retries) throw e;
+        attempt++;
+        const backoff = Math.min(1000 * 2 ** (attempt - 1), 6000) + Math.random() * 300;
+        await new Promise(r => setTimeout(r, backoff));
+      }
     }
   }
   async _sse(path, onEvent, query=null){
@@ -523,6 +549,7 @@ const state = {
   charts: {},
   listeners: [],
   dataReady: false,
+  usingCachedData: false,        // true when the currently-shown data came from localStorage, not a live fetch
   dashboardScope: 'current',     // 'current' | 'all' - Manager toggle on Dashboard
   allDepotsSummary: null,        // cached { [depotId]: summary } once loaded
   allDepotsSummaryLoading: false,
@@ -608,6 +635,23 @@ function reportSyncError(label, err){
   }, 400);
 }
 
+/* ------------------------------ Offline Cache ------------------------------
+   Every collection's live data now also gets mirrored into localStorage as
+   it arrives. If a screen loads (or a listener drops and can't reconnect)
+   while offline, we hydrate straight from this last-known-good snapshot
+   instead of leaving the UI blank/zeroed until the network comes back. */
+function cacheKey(name, scopeId){ return `depot-cache:${name}:${scopeId || '_'}`; }
+function cacheSave(name, scopeId, data){
+  try { localStorage.setItem(cacheKey(name, scopeId), JSON.stringify({ data, savedAt: Date.now() })); }
+  catch(e){ /* storage full/unavailable (e.g. private browsing) - caching is a nice-to-have, never fatal */ }
+}
+function cacheLoad(name, scopeId){
+  try {
+    const raw = localStorage.getItem(cacheKey(name, scopeId));
+    return raw ? JSON.parse(raw) : null;
+  } catch(e){ return null; }
+}
+
 /* -------------------------------- Icons -------------------------------- */
 function svgIcon(path, extra=''){ return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 shrink-0" ${extra}>${path}</svg>`; }
 function iconDashboard(){ return svgIcon('<rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>'); }
@@ -675,18 +719,38 @@ async function login(username, password){
 async function loadDepotsForUser(){
   // Populates state.depots with every depot the signed-in account can see,
   // and picks (or keeps) which one is currently active.
+  // Cache key scopes by account (Manager username, or SDC's own user id) so
+  // different accounts on the same device never see each other's list.
+  const cacheScope = state.user.role === 'MANAGER' ? `mgr:${state.user.username}` : `sdc:${state.user.id}`;
+  try {
+    if (state.user.role === 'MANAGER') {
+      // Each Manager is their own tenant - only ever see depots you own,
+      // queried directly by your username rather than filtering the whole
+      // depots collection.
+      const snap = await db.collection('depots').where('ownerUsername','==',state.user.username).get();
+      state.depots = snap.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>rtdbCompare(a.name,b.name));
+    } else {
+      const allDepots = (await db.collection('depots').get()).docs.map(d=>({id:d.id, ...d.data()}));
+      state.depots = allDepots.filter(d=>d.id === state.user.depotId);
+    }
+    cacheSave('depots', cacheScope, state.depots);
+    state.usingCachedData = false;
+  } catch(e){
+    // Offline (or the request otherwise failed): fall back to the last
+    // known depot list instead of throwing, which previously bubbled up to
+    // init() and logged the person out entirely just because the network
+    // blipped on startup.
+    const cached = cacheLoad('depots', cacheScope);
+    if (!cached) throw e; // genuinely nothing to show (e.g. first-ever login offline) - let the caller handle it
+    state.depots = cached.data;
+    state.usingCachedData = true;
+    reportSyncError('depots (offline)', e);
+  }
   if (state.user.role === 'MANAGER') {
-    // Each Manager is their own tenant - only ever see depots you own,
-    // queried directly by your username rather than filtering the whole
-    // depots collection.
-    const snap = await db.collection('depots').where('ownerUsername','==',state.user.username).get();
-    state.depots = snap.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>rtdbCompare(a.name,b.name));
     const ids = state.depots.map(d=>d.id);
     const saved = localStorage.getItem('depot-current-id');
     state.currentDepotId = (saved && ids.includes(saved)) ? saved : (state.depots[0] ? state.depots[0].id : null);
   } else {
-    const allDepots = (await db.collection('depots').get()).docs.map(d=>({id:d.id, ...d.data()}));
-    state.depots = allDepots.filter(d=>d.id === state.user.depotId);
     state.currentDepotId = state.user.depotId || null;
   }
   if (state.currentDepotId) localStorage.setItem('depot-current-id', state.currentDepotId);
@@ -781,7 +845,12 @@ function attachUsernameAvailabilityCheck(inputId, statusId){
         }
       } catch(err){
         if (myToken !== requestToken) return;
-        status.textContent = '';
+        // Don't just go blank on failure - that reads as "still checking"
+        // forever with no indication anything went wrong. This is non-
+        // blocking (the form can still be submitted; checkUsernameAvailable
+        // runs again server-side at that point), just informational.
+        status.textContent = 'Could not check availability - check your connection';
+        status.className = 'text-xs mt-1 text-gray-400';
       }
     }, 450);
   });
@@ -909,10 +978,28 @@ function startRealtimeSync(){
     state.sdcAccounts = [];
     state.dataReady = true;
     state.loading = false;
+    state.usingCachedData = false;
     return Promise.resolve();
   }
   state.loading = true;
   const isManager = state.user && state.user.role === 'MANAGER';
+
+  // Hydrate immediately from whatever was cached last time this depot
+  // synced successfully, so the dashboard/lists show real numbers right
+  // away instead of sitting blank while the first live fetch is in flight -
+  // this is what actually gets replaced by fresh data a moment later, or
+  // stays put (marked as offline) if that fetch never lands.
+  let hydratedFromCache = false;
+  SYNC_COLLECTIONS.forEach(c=>{
+    const cached = cacheLoad(c.name, state.currentDepotId);
+    if (cached){ state[c.stateKey] = cached.data; hydratedFromCache = true; }
+  });
+  if (isManager) {
+    const cachedSdc = cacheLoad('sdcAccounts', state.user.username);
+    if (cachedSdc){ state.sdcAccounts = cachedSdc.data; hydratedFromCache = true; }
+  }
+  state.usingCachedData = hydratedFromCache;
+
   let pending = SYNC_COLLECTIONS.length + (isManager ? 1 : 0);
   return new Promise(resolve=>{
     const markReceived = () => {
@@ -934,11 +1021,16 @@ function startRealtimeSync(){
         q = c.desc ? q.orderBy(c.orderField,'desc') : q.orderBy(c.orderField);
         const unsub = q.onSnapshot(snap=>{
           state[c.stateKey] = snap.docs.map(d=>({id:d.id, ...d.data()}));
+          cacheSave(c.name, state.currentDepotId, state[c.stateKey]);
+          state.usingCachedData = false;
           markReceived();
           // Live-refresh whatever the signed-in user is currently looking at,
           // so changes made on another device/account appear without reload.
           if (state.user && state.dataReady) renderPageAfterFetch();
         }, err=>{
+          // Leaves state[c.stateKey] exactly as it was (cached data if we
+          // hydrated above, or whatever the last live update left it as) -
+          // never wipes it to empty just because this one fetch failed.
           reportSyncError(c.name, err);
           markReceived();
         });
@@ -955,6 +1047,8 @@ function startRealtimeSync(){
         const q = db.collection('users').where('ownerUsername','==',state.user.username);
         const unsub = q.onSnapshot(snap=>{
           state.sdcAccounts = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(u=>u.role==='SDC' && !u.deleted);
+          cacheSave('sdcAccounts', state.user.username, state.sdcAccounts);
+          state.usingCachedData = false;
           markReceived();
           if (state.user && state.dataReady) renderPageAfterFetch();
         }, err=>{
@@ -1273,6 +1367,12 @@ function attachLoginEvents(){
     // tenant, so there's nothing to check first - just open the form.
     state.authView = 'signup';
     render();
+    // Belt-and-suspenders: the boot-time warm-up in init() usually already
+    // has this ready, but retry here too in case that attempt hasn't
+    // finished yet (or failed, e.g. the page loaded offline and has since
+    // reconnected) - the debounced username check gives this ~450ms+ to
+    // land before the first real lookup fires.
+    ensureAnonAuth().catch(()=>{});
   });
 
   const showLogin = document.getElementById('show-login');
@@ -1350,6 +1450,15 @@ function attachAppEvents(){
   });
 }
 
+function offlineBannerHtml(){
+  if (!state.usingCachedData) return '';
+  return `
+  <div class="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+    ${iconRefresh()}
+    <span>Showing the last data saved on this device - reconnecting to sync the latest changes.</span>
+  </div>`;
+}
+
 async function renderPageContent(){
   const el = document.getElementById('page-content');
   el.innerHTML = `<div class="space-y-4">${Array.from({length:4}).map(()=>'<div class="skeleton h-28"></div>').join('')}</div>`;
@@ -1357,17 +1466,31 @@ async function renderPageContent(){
   const el2 = document.getElementById('page-content');
   if (!el2) return; // page may have changed while awaiting
   const page = (state.user.role==='MANAGER' && state.depots.length===0) ? 'depots' : state.page;
+  let body;
   switch(page){
-    case 'dashboard': el2.innerHTML = renderDashboard(); attachDashboardEvents(); break;
-    case 'stock-movement': el2.innerHTML = renderStockMovement(); attachStockMovementEvents(); break;
-    case 'maize-purchases': el2.innerHTML = renderMaizePurchases(); attachMaizePurchasesEvents(); break;
-    case 'maize-dispatches': el2.innerHTML = renderMaizeDispatches(); attachMaizeDispatchesEvents(); break;
-    case 'personnel': el2.innerHTML = renderPersonnel(); attachPersonnelEvents(); break;
-    case 'accounts': el2.innerHTML = renderAccounts(); attachAccountsEvents(); break;
-    case 'labor-payments': el2.innerHTML = renderLaborPayments(); attachLaborPaymentsEvents(); break;
-    case 'depots': el2.innerHTML = renderDepots(); attachDepotsEvents(); break;
-    case 'reports': el2.innerHTML = renderReports(); attachReportsEvents(); break;
-    default: el2.innerHTML = renderDashboard(); attachDashboardEvents();
+    case 'dashboard': body = renderDashboard(); break;
+    case 'stock-movement': body = renderStockMovement(); break;
+    case 'maize-purchases': body = renderMaizePurchases(); break;
+    case 'maize-dispatches': body = renderMaizeDispatches(); break;
+    case 'personnel': body = renderPersonnel(); break;
+    case 'accounts': body = renderAccounts(); break;
+    case 'labor-payments': body = renderLaborPayments(); break;
+    case 'depots': body = renderDepots(); break;
+    case 'reports': body = renderReports(); break;
+    default: body = renderDashboard();
+  }
+  el2.innerHTML = offlineBannerHtml() + body;
+  switch(page){
+    case 'dashboard': attachDashboardEvents(); break;
+    case 'stock-movement': attachStockMovementEvents(); break;
+    case 'maize-purchases': attachMaizePurchasesEvents(); break;
+    case 'maize-dispatches': attachMaizeDispatchesEvents(); break;
+    case 'personnel': attachPersonnelEvents(); break;
+    case 'accounts': attachAccountsEvents(); break;
+    case 'labor-payments': attachLaborPaymentsEvents(); break;
+    case 'depots': attachDepotsEvents(); break;
+    case 'reports': attachReportsEvents(); break;
+    default: attachDashboardEvents();
   }
 }
 
@@ -1382,16 +1505,30 @@ async function renderPageAfterFetch(){
   const el = document.getElementById('page-content');
   if (!el) return;
   const page = (state.user.role==='MANAGER' && state.depots.length===0) ? 'depots' : state.page;
+  let body;
   switch(page){
-    case 'dashboard': el.innerHTML = renderDashboard(); attachDashboardEvents(); break;
-    case 'stock-movement': el.innerHTML = renderStockMovement(); attachStockMovementEvents(); break;
-    case 'maize-purchases': el.innerHTML = renderMaizePurchases(); attachMaizePurchasesEvents(); break;
-    case 'maize-dispatches': el.innerHTML = renderMaizeDispatches(); attachMaizeDispatchesEvents(); break;
-    case 'personnel': el.innerHTML = renderPersonnel(); attachPersonnelEvents(); break;
-    case 'accounts': el.innerHTML = renderAccounts(); attachAccountsEvents(); break;
-    case 'labor-payments': el.innerHTML = renderLaborPayments(); attachLaborPaymentsEvents(); break;
-    case 'depots': el.innerHTML = renderDepots(); attachDepotsEvents(); break;
-    case 'reports': el.innerHTML = renderReports(); attachReportsEvents(); break;
+    case 'dashboard': body = renderDashboard(); break;
+    case 'stock-movement': body = renderStockMovement(); break;
+    case 'maize-purchases': body = renderMaizePurchases(); break;
+    case 'maize-dispatches': body = renderMaizeDispatches(); break;
+    case 'personnel': body = renderPersonnel(); break;
+    case 'accounts': body = renderAccounts(); break;
+    case 'labor-payments': body = renderLaborPayments(); break;
+    case 'depots': body = renderDepots(); break;
+    case 'reports': body = renderReports(); break;
+    default: return;
+  }
+  el.innerHTML = offlineBannerHtml() + body;
+  switch(page){
+    case 'dashboard': attachDashboardEvents(); break;
+    case 'stock-movement': attachStockMovementEvents(); break;
+    case 'maize-purchases': attachMaizePurchasesEvents(); break;
+    case 'maize-dispatches': attachMaizeDispatchesEvents(); break;
+    case 'personnel': attachPersonnelEvents(); break;
+    case 'accounts': attachAccountsEvents(); break;
+    case 'labor-payments': attachLaborPaymentsEvents(); break;
+    case 'depots': attachDepotsEvents(); break;
+    case 'reports': attachReportsEvents(); break;
   }
 }
 
@@ -2542,9 +2679,22 @@ function attachReportsEvents(){
   if (saved){
     try{
       state.user = JSON.parse(saved);
-      await ensureAnonAuth();
-      await loadDepotsForUser();
+      // Sign-in and the first depot fetch are two separate failure modes on
+      // a flaky connection at startup. Only treat this as "not logged in"
+      // if we can't even parse the saved session - a network hiccup on
+      // either of these should fall back to cached data, not sign
+      // someone out just because they opened the app without signal.
+      try { await ensureAnonAuth(); } catch(e){ reportSyncError('sign-in (offline)', e); }
+      try { await loadDepotsForUser(); } catch(e){ reportSyncError('depots (offline)', e); }
     } catch(e){ state.user = null; }
+  } else {
+    // No saved session - this is a brand-new visitor. Warm up an anonymous
+    // auth session in the background (don't block first paint on it) so
+    // that if they open the signup form, the live username-availability
+    // check - which reads the `users` node and requires `auth != null` per
+    // the RTDB rules - already has a valid token instead of silently
+    // failing on every keystroke until the form is actually submitted.
+    ensureAnonAuth().catch(()=>{}); // best-effort; offline visitors just won't get the live check until they're online, same as before
   }
   try{
     render();
