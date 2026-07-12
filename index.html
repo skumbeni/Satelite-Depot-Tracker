@@ -360,13 +360,21 @@ class RTDBClient {
       clearTimeout(timer);
     }
   }
-  async _fetch(path, method='GET', body, timeoutMs=12000, query=null, retries=3){
+  async _fetch(path, method='GET', body, timeoutMs=6000, query=null, retries=1){
     // A single weak-signal blip used to surface immediately as a user-facing
     // error (a toast, a stuck button) even though the same request would
-    // have gone through fine two seconds later. Retry transient failures a
-    // few times with backoff before giving up - most mobile network drops
-    // are momentary, so this makes them invisible to the user instead of
-    // requiring them to notice the error and manually retry themselves.
+    // have gone through fine two seconds later. Retry a transient failure
+    // once with a short backoff before giving up.
+    //
+    // Kept deliberately tight (6s timeout, 1 retry -> ~13s worst case)
+    // because every one-shot get/set/query in this app runs synchronously
+    // in front of a UI action (a button that says "Creating...", a status
+    // line that says "Checking..."). The old defaults (12s timeout, 3
+    // retries, backoff up to 6s) meant a single foreground action could
+    // legitimately take ~40s to fail on a weak connection, which reads as
+    // "hung" to the person tapping the button long before the error ever
+    // surfaces. Live listeners (onSnapshot/_sse) are unaffected - those
+    // reconnect on their own schedule and don't go through this method.
     let attempt = 0;
     for (;;) {
       try {
@@ -374,7 +382,7 @@ class RTDBClient {
       } catch (e) {
         if (!e.retryable || attempt >= retries) throw e;
         attempt++;
-        const backoff = Math.min(1000 * 2 ** (attempt - 1), 6000) + Math.random() * 300;
+        const backoff = Math.min(800 * 2 ** (attempt - 1), 1500) + Math.random() * 300;
         await new Promise(r => setTimeout(r, backoff));
       }
     }
@@ -812,7 +820,25 @@ async function signup(username, password, name, phone, depotChoice){
 async function checkUsernameAvailable(username){
   if (!username) return null;
   const snap = await db.collection('users').where('username','==',username).limit(1).get();
-  return snap.empty;
+  const available = snap.empty;
+  __lastUsernameCheck = { username, available, ts: Date.now() };
+  return available;
+}
+
+// Populated by checkUsernameAvailable (including the live typing indicator).
+// createSdcAccount reads this to skip a second network round-trip for the
+// exact same username on submit - on a slow connection that second check
+// was doubling the wait for no benefit, since nothing changes username
+// availability in the few seconds between "stopped typing" and "tapped
+// Create". Anything older than 8s, or for a different username, is
+// ignored and re-checked for real - this is just for the common case of
+// submitting right after the live indicator already confirmed it.
+let __lastUsernameCheck = null;
+async function checkUsernameAvailableCached(username){
+  if (__lastUsernameCheck && __lastUsernameCheck.username === username && (Date.now() - __lastUsernameCheck.ts) < 8000) {
+    return __lastUsernameCheck.available;
+  }
+  return checkUsernameAvailable(username);
 }
 
 // Wires a live "is this username available?" indicator onto any username
@@ -863,7 +889,7 @@ async function createSdcAccount(username, password, name, phone, depotId){
   if (password.length < 6) throw new Error('Password must be at least 6 characters.');
   if (!depotId) throw new Error('Select a depot first.');
 
-  const available = await checkUsernameAvailable(username);
+  const available = await checkUsernameAvailableCached(username);
   if (!available) throw new Error('That username is already taken. Please choose another.');
 
   const newUserRef = db.collection('users').doc();
