@@ -781,7 +781,7 @@ async function signup(username, password, name, phone, depotChoice){
   if (!username || !password || !name) throw new Error('Please fill in all required fields.');
   if (password.length < 6) throw new Error('Password must be at least 6 characters.');
 
-  const available = await checkUsernameAvailable(username);
+  const available = await checkUsernameAvailableCached(username);
   if (!available) throw new Error('That username is already taken. Please choose another.');
 
   // Every signup creates a brand-new Manager account with its own private
