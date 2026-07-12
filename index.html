@@ -379,7 +379,7 @@ class RTDBClient {
       }
     }
   }
-  async _sse(path, onEvent, query=null){
+  async _sse(path, onEvent, query=null, onOpen=null){
     const token = await this.getAuthToken();
     const params = { ...(query || {}) };
     if (token) params.auth = token;
@@ -388,6 +388,7 @@ class RTDBClient {
     const es = new EventSource(url);
     es.addEventListener('put', onEvent);
     es.addEventListener('patch', onEvent);
+    if (onOpen) es.addEventListener('open', onOpen, { once: true });
     es.onerror = ()=>{}; // EventSource auto-reconnects; surfaced errors are noisy and non-fatal
     return () => es.close();
   }
@@ -450,7 +451,7 @@ class RTDBQuery {
       docs: docs.map(d => ({ id: d.id, data: () => d.data })),
     };
   }
-  onSnapshot(onNext, onError){
+  onSnapshot(onNext, onError, onOpen){
     // Each subscription used to open TWO connections at once: an immediate
     // GET fetch for the initial snapshot, plus a long-lived SSE stream for
     // live updates. With several collections syncing at once (each SSE
@@ -468,7 +469,7 @@ class RTDBQuery {
       if (stopped) return;
       try { onNext(await this.get()); gotFirst = true; } catch (e) { if (onError) onError(e); }
     };
-    this.client._sse(this.path, applySnapshot, this._restQuery()).then(unsub => { stopped ? unsub() : (unsubSSE = unsub); });
+    this.client._sse(this.path, applySnapshot, this._restQuery(), onOpen).then(unsub => { stopped ? unsub() : (unsubSSE = unsub); });
     const fallbackTimer = setTimeout(() => {
       if (!stopped && !gotFirst) applySnapshot();
     }, 8000);
@@ -1009,44 +1010,59 @@ function startRealtimeSync(){
         if (pending === 0){ state.dataReady = true; state.loading = false; resolve(); }
       }
     };
-    // Each collection's onSnapshot opens TWO connections at once (an initial
-    // fetch + a long-lived SSE stream). Firing all of these in the same tick
-    // can exceed the browser's per-host connection cap (especially on mobile
-    // carrier networks that force HTTP/1.1's 6-connection limit), leaving
-    // later requests queued behind the never-closing SSE streams until they
-    // hit the client-side timeout - even though the network itself is fine.
-    // Staggering the startup by a beat per collection avoids that pile-up.
-    SYNC_COLLECTIONS.forEach((c, i)=>{
-      setTimeout(()=>{
-        let q = db.collection(c.name).where('depotId','==',state.currentDepotId);
-        q = c.desc ? q.orderBy(c.orderField,'desc') : q.orderBy(c.orderField);
-        const unsub = q.onSnapshot(snap=>{
-          let docs = snap.docs.map(d=>({id:d.id, ...d.data()}));
-          if (c.name === 'stockItems') docs = docs.filter(item=>!item.deleted);
-          state[c.stateKey] = docs;
-          cacheSave(c.name, state.currentDepotId, state[c.stateKey]);
-          state.usingCachedData = false;
-          markReceived();
-          // Live-refresh whatever the signed-in user is currently looking at,
-          // so changes made on another device/account appear without reload.
-          if (state.user && state.dataReady) renderPageAfterFetch();
-        }, err=>{
-          // Leaves state[c.stateKey] exactly as it was (cached data if we
-          // hydrated above, or whatever the last live update left it as) -
-          // never wipes it to empty just because this one fetch failed.
-          reportSyncError(c.name, err);
-          markReceived();
-        });
-        state.listeners.push(unsub);
-      }, i * 150);
+    // Each collection's onSnapshot opens a long-lived SSE connection that
+    // never closes. Starting all of them within the same short window (the
+    // previous fix just used a fixed 150ms delay per collection) still lets
+    // several connection ATTEMPTS overlap - on slow/carrier-proxied 4G, the
+    // handshake for one stream can easily take longer than 150ms, so multiple
+    // attempts pile up and exceed the browser's per-host connection cap
+    // anyway, and every one of them times out together. Instead, start
+    // collections one at a time and gate each next start on the previous
+    // stream actually opening (or a bounded fallback wait if it's stuck) -
+    // this guarantees only one connection is ever mid-handshake at once,
+    // regardless of how slow any individual attempt is.
+    const startCollection = (c) => new Promise(advance => {
+      let advanced = false;
+      const next = () => { if (advanced) return; advanced = true; advance(); };
+      let q = db.collection(c.name).where('depotId','==',state.currentDepotId);
+      q = c.desc ? q.orderBy(c.orderField,'desc') : q.orderBy(c.orderField);
+      const unsub = q.onSnapshot(snap=>{
+        let docs = snap.docs.map(d=>({id:d.id, ...d.data()}));
+        if (c.name === 'stockItems') docs = docs.filter(item=>!item.deleted);
+        state[c.stateKey] = docs;
+        cacheSave(c.name, state.currentDepotId, state[c.stateKey]);
+        state.usingCachedData = false;
+        markReceived();
+        // Live-refresh whatever the signed-in user is currently looking at,
+        // so changes made on another device/account appear without reload.
+        if (state.user && state.dataReady) renderPageAfterFetch();
+      }, err=>{
+        // Leaves state[c.stateKey] exactly as it was (cached data if we
+        // hydrated above, or whatever the last live update left it as) -
+        // never wipes it to empty just because this one fetch failed.
+        reportSyncError(c.name, err);
+        markReceived();
+        next();
+      }, next);
+      state.listeners.push(unsub);
+      // This is a safety net for a connection that's genuinely stuck (bad
+      // auth, dead proxy, etc), NOT a substitute for waiting on slow ones.
+      // On the exact conditions this fix targets - poor 4G - a stream can
+      // legitimately take several seconds to open, and advancing early
+      // just recreates the pile-up we're trying to avoid (the previous,
+      // still-connecting attempt is never cancelled, so a short fallback
+      // here means two+ attempts end up in flight at once anyway). Keep
+      // this long enough that it almost never fires under real congestion.
+      setTimeout(next, 20000);
     });
-    // SDC login accounts (Manager-only "SDC Accounts" page) live-sync the
-    // same way as every other collection above, rather than the one-off
-    // fetch this used to do on every single open/refresh of that page -
-    // that manual round-trip was the only thing making the Accounts tab
-    // noticeably slower to open than any other tab.
-    if (isManager) {
-      setTimeout(()=>{
+    (async ()=>{
+      for (const c of SYNC_COLLECTIONS) await startCollection(c);
+      // SDC login accounts (Manager-only "SDC Accounts" page) live-sync the
+      // same way as every other collection above, rather than the one-off
+      // fetch this used to do on every single open/refresh of that page -
+      // that manual round-trip was the only thing making the Accounts tab
+      // noticeably slower to open than any other tab.
+      if (isManager) {
         const q = db.collection('users').where('ownerUsername','==',state.user.username);
         const unsub = q.onSnapshot(snap=>{
           state.sdcAccounts = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(u=>u.role==='SDC' && !u.deleted);
@@ -1059,8 +1075,8 @@ function startRealtimeSync(){
           markReceived();
         });
         state.listeners.push(unsub);
-      }, SYNC_COLLECTIONS.length * 150);
-    }
+      }
+    })();
   });
 }
 
@@ -1086,7 +1102,7 @@ function computeStockBalances(items=state.stockItems, txs=state.stockTransaction
 const KG_PER_BAG = 50;
 function kgToBags(kg){ return Math.round(((Number(kg)||0) / KG_PER_BAG) * 10) / 10; }
 function fmtBags(kg){ return fmtNum(kgToBags(kg)); }
-function fmtKgBags(kg){ return `${fmtNum(kg)} kg (${fmtBags(kg)} bags)`; }
+function fmtKgBags(kg){ return `${fmtBags(kg)} bags (${fmtNum(kg)} kg)`; }
 
 function computeMaizeBalance(purchases=state.maizePurchases, dispatches=state.maizeDispatches){
   const totalPurchasedKg = purchases.reduce((s,p)=>s+p.quantityKg,0);
@@ -1697,10 +1713,10 @@ function renderDashboard(){
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      ${kpiCard('Maize Balance', `${fmtNum(maizeBalance.balanceKg)} kg`, `${fmtBags(maizeBalance.balanceKg)} bags | Purchased: ${fmtBags(maizeBalance.totalPurchasedKg)} bags | Cost: ZMW ${fmtNum(maizeBalance.totalPurchaseCost)}`, 'bg-emerald-100 text-emerald-600', iconWheat())}
+      ${kpiCard('Maize Balance', `${fmtBags(maizeBalance.balanceKg)} bags`, `${fmtNum(maizeBalance.balanceKg)} kg | Purchased: ${fmtBags(maizeBalance.totalPurchasedKg)} bags | Cost: ZMW ${fmtNum(maizeBalance.totalPurchaseCost)}`, 'bg-emerald-100 text-emerald-600', iconWheat())}
       ${kpiCard('Total Stock Items', stockBalances.length, `${stockBalances.filter(s=>s.balance>0).length} items with stock`, 'bg-amber-100 text-amber-600', iconCart())}
       ${state.user.role==='MANAGER' ? kpiCard('Active Personnel', activePersonnel.length, `Labor cost this month: ZMW ${fmtNum(laborThisMonth)}`, 'bg-sky-100 text-sky-600', iconUsers()) : ''}
-      ${kpiCard('Maize Dispatched', `${fmtNum(maizeBalance.totalDispatchedKg)} kg`, `${fmtBags(maizeBalance.totalDispatchedKg)} bags | To Main Depot`, 'bg-rose-100 text-rose-600', iconTruck())}
+      ${kpiCard('Maize Dispatched', `${fmtBags(maizeBalance.totalDispatchedKg)} bags`, `${fmtNum(maizeBalance.totalDispatchedKg)} kg | To Main Depot`, 'bg-rose-100 text-rose-600', iconTruck())}
     </div>
 
     ${state.user.role==='MANAGER' ? `
@@ -1750,18 +1766,18 @@ function renderDashboard(){
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div class="rounded-lg bg-emerald-50 p-4 text-center">
           <p class="text-xs text-gray-500 mb-1">Total Purchased</p>
-          <p class="text-xl font-bold text-emerald-800">${fmtNum(maizeBalance.totalPurchasedKg)} kg</p>
-          <p class="text-xs text-gray-500 mt-1">${fmtBags(maizeBalance.totalPurchasedKg)} bags</p>
+          <p class="text-xl font-bold text-emerald-800">${fmtBags(maizeBalance.totalPurchasedKg)} bags</p>
+          <p class="text-xs text-gray-500 mt-1">${fmtNum(maizeBalance.totalPurchasedKg)} kg</p>
         </div>
         <div class="rounded-lg bg-rose-50 p-4 text-center">
           <p class="text-xs text-gray-500 mb-1">Total Dispatched</p>
-          <p class="text-xl font-bold text-rose-800">${fmtNum(maizeBalance.totalDispatchedKg)} kg</p>
-          <p class="text-xs text-gray-500 mt-1">${fmtBags(maizeBalance.totalDispatchedKg)} bags</p>
+          <p class="text-xl font-bold text-rose-800">${fmtBags(maizeBalance.totalDispatchedKg)} bags</p>
+          <p class="text-xs text-gray-500 mt-1">${fmtNum(maizeBalance.totalDispatchedKg)} kg</p>
         </div>
         <div class="rounded-lg bg-amber-50 p-4 text-center">
           <p class="text-xs text-gray-500 mb-1">Current Balance</p>
-          <p class="text-xl font-bold text-amber-800">${fmtNum(maizeBalance.balanceKg)} kg</p>
-          <p class="text-xs text-gray-500 mt-1">${fmtBags(maizeBalance.balanceKg)} bags | Total Cost: ZMW ${fmtNum(maizeBalance.totalPurchaseCost)}</p>
+          <p class="text-xl font-bold text-amber-800">${fmtBags(maizeBalance.balanceKg)} bags</p>
+          <p class="text-xs text-gray-500 mt-1">${fmtNum(maizeBalance.balanceKg)} kg | Total Cost: ZMW ${fmtNum(maizeBalance.totalPurchaseCost)}</p>
         </div>
       </div>
     </div>
@@ -1793,8 +1809,8 @@ function renderDashboard(){
                 ${d.idtIptNumber ? `<p class="text-xs text-gray-400">IDT/IPT: ${esc(d.idtIptNumber)}</p>` : ''}
               </div>
               <div class="text-right shrink-0 ml-2">
-                <p class="text-sm font-medium">${fmtNum(d.quantityKg)} kg</p>
-                <p class="text-xs text-gray-400">${fmtBags(d.quantityKg)} bags · ${fmtDate(d.date)}</p>
+                <p class="text-sm font-medium">${fmtBags(d.quantityKg)} bags</p>
+                <p class="text-xs text-gray-400">${fmtNum(d.quantityKg)} kg · ${fmtDate(d.date)}</p>
               </div>
             </div>`).join('')}
         </div>
@@ -2079,7 +2095,7 @@ function renderMaizePurchases(){
       </div>
     </div>
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-      <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Total Purchased</p><p class="text-2xl font-bold mt-1">${fmtNum(grandTotal)} kg</p><p class="text-xs text-gray-500 mt-1">${fmtBags(grandTotal)} bags</p></div>
+      <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Total Purchased</p><p class="text-2xl font-bold mt-1">${fmtBags(grandTotal)} bags</p><p class="text-xs text-gray-500 mt-1">${fmtNum(grandTotal)} kg</p></div>
       <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Total Investment</p><p class="text-2xl font-bold mt-1">ZMW ${fmtNum(grandCost)}</p></div>
       <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Last PRCN# Today</p><p class="text-2xl font-bold mt-1">${lastPrcn ? esc(lastPrcn) : '-'}</p><p class="text-xs text-gray-500 mt-1">Produce Receipt &amp; Certification Note</p></div>
     </div>
@@ -2093,8 +2109,8 @@ function renderMaizePurchases(){
               <tr>
                 <td class="text-xs">${fmtDate(p.date)}</td>
                 <td class="font-medium">${esc(p.supplier)}</td>
-                <td class="text-right">${fmtBags(p.quantityKg)}</td>
-                <td class="text-right font-semibold">${fmtNum(p.quantityKg)}</td>
+                <td class="text-right font-semibold">${fmtBags(p.quantityKg)}</td>
+                <td class="text-right text-gray-500">${fmtNum(p.quantityKg)}</td>
                 <td class="text-right text-gray-500">${Number(p.pricePerKg).toFixed(2)}</td>
                 <td class="text-right font-semibold">ZMW ${fmtNum(p.totalCost)}</td>
                 <td class="text-xs">${p.prcnNumber ? `<span class="badge border border-gray-300 text-gray-700">${esc(p.prcnNumber)}</span>` : '-'}</td>
@@ -2118,9 +2134,9 @@ function maizePurchaseModal(){
         <div><label class="label">Supplier *</label><input class="input" id="p-supplier" placeholder="Supplier name" required></div>
         <div class="grid grid-cols-2 gap-3">
           <div><label class="label">Quantity (Bags) *</label><input class="input" type="number" min="0" step="0.1" id="p-bags" required></div>
-          <div><label class="label">Quantity (kg)</label><input class="input" type="number" min="0" step="0.1" id="p-qty" required></div>
+          <div><label class="label">Quantity (kg)</label><input class="input bg-gray-100" type="number" min="0" step="0.1" id="p-qty" readonly></div>
         </div>
-        <p class="text-xs text-gray-400 -mt-2">1 bag = ${KG_PER_BAG}kg. Enter either field - the other fills in automatically.</p>
+        <p class="text-xs text-gray-400 -mt-2">1 bag = ${KG_PER_BAG}kg. Enter bags — kg is calculated automatically.</p>
         <div><label class="label">Price per kg (ZMW) *</label><input class="input" type="number" min="0" step="0.01" id="p-price" required></div>
         <div class="rounded-lg bg-gray-50 p-3 flex justify-between text-sm">
           <span class="text-gray-500">Total Cost:</span>
@@ -2148,17 +2164,15 @@ function attachMaizePurchasesEvents(){
     bindModalClose();
     const qtyEl = document.getElementById('p-qty'), bagsEl = document.getElementById('p-bags'), priceEl = document.getElementById('p-price'), totalEl = document.getElementById('p-total');
     const updateTotal = ()=>{ totalEl.textContent = 'ZMW ' + ((Number(qtyEl.value)||0) * (Number(priceEl.value)||0)).toLocaleString(); };
-    let syncing = false;
-    bagsEl.addEventListener('input', ()=>{ if (syncing) return; syncing=true; qtyEl.value = ((Number(bagsEl.value)||0) * KG_PER_BAG).toString(); syncing=false; updateTotal(); });
-    qtyEl.addEventListener('input', ()=>{ if (syncing) return; syncing=true; bagsEl.value = kgToBags(Number(qtyEl.value)||0).toString(); syncing=false; updateTotal(); });
+    bagsEl.addEventListener('input', ()=>{ qtyEl.value = ((Number(bagsEl.value)||0) * KG_PER_BAG).toString(); updateTotal(); });
     priceEl.addEventListener('input', updateTotal);
     document.getElementById('purchase-form').addEventListener('submit', async (e)=>{
       e.preventDefault();
       const supplier = document.getElementById('p-supplier').value.trim();
-      const quantityKg = Number(qtyEl.value);
-      const quantityBags = Number(bagsEl.value) || kgToBags(quantityKg);
+      const quantityBags = Number(bagsEl.value);
+      const quantityKg = quantityBags * KG_PER_BAG;
       const pricePerKg = Number(priceEl.value);
-      if (!supplier || !quantityKg || quantityKg<=0 || !pricePerKg){ toast('Please fill all required fields','error'); return; }
+      if (!supplier || !quantityBags || quantityBags<=0 || !pricePerKg){ toast('Please fill all required fields','error'); return; }
       const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
       try{
         await db.collection('maizePurchases').add({
@@ -2191,7 +2205,7 @@ function renderMaizeDispatches(){
         <button id="new-dispatch-btn" class="btn btn-primary">${iconPlus()} New Dispatch</button>
       </div>
     </div>
-    <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Total Dispatched</p><p class="text-2xl font-bold mt-1">${fmtNum(totalDispatched)} kg</p><p class="text-xs text-gray-500 mt-1">${fmtBags(totalDispatched)} bags</p></div>
+    <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Total Dispatched</p><p class="text-2xl font-bold mt-1">${fmtBags(totalDispatched)} bags</p><p class="text-xs text-gray-500 mt-1">${fmtNum(totalDispatched)} kg</p></div>
     <div class="card p-4">
       <h3 class="text-base font-semibold mb-3">Dispatch Records</h3>
       <div class="overflow-x-auto">
@@ -2201,8 +2215,8 @@ function renderMaizeDispatches(){
             ${state.maizeDispatches.length===0 ? '<tr><td colspan="8" class="text-center py-8 text-gray-400">No dispatches recorded yet</td></tr>' : state.maizeDispatches.map(d=>`
               <tr>
                 <td class="text-xs">${fmtDate(d.date)}</td>
-                <td class="text-right">${fmtBags(d.quantityKg)}</td>
-                <td class="text-right font-semibold">${fmtNum(d.quantityKg)}</td>
+                <td class="text-right font-semibold">${fmtBags(d.quantityKg)}</td>
+                <td class="text-right text-gray-500">${fmtNum(d.quantityKg)}</td>
                 <td class="font-medium">${esc(d.destination)}</td>
                 <td class="text-xs">${esc(d.vehicleReg)||'-'}</td>
                 <td class="text-xs">${esc(d.driverName)||'-'}</td>
@@ -2232,9 +2246,9 @@ function maizeDispatchModal(){
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div><label class="label">Quantity (Bags) *</label><input class="input" type="number" min="0" step="0.1" id="d-bags" required></div>
-          <div><label class="label">Quantity (kg)</label><input class="input" type="number" min="0" step="0.1" id="d-qty" required></div>
+          <div><label class="label">Quantity (kg)</label><input class="input bg-gray-100" type="number" min="0" step="0.1" id="d-qty" readonly></div>
         </div>
-        <p class="text-xs text-gray-400 -mt-2">1 bag = ${KG_PER_BAG}kg. Enter either field - the other fills in automatically.</p>
+        <p class="text-xs text-gray-400 -mt-2">1 bag = ${KG_PER_BAG}kg. Enter bags — kg is calculated automatically.</p>
         <div><label class="label">Date *</label><input class="input" type="date" id="d-date" value="${todayStr()}" required></div>
         <div><label class="label">Destination</label><input class="input" id="d-dest" value="Main Depot"></div>
         <div class="grid grid-cols-2 gap-3">
@@ -2258,14 +2272,12 @@ function attachMaizeDispatchesEvents(){
     document.getElementById('modal-root').innerHTML = maizeDispatchModal();
     bindModalClose();
     const dQtyEl = document.getElementById('d-qty'), dBagsEl = document.getElementById('d-bags');
-    let dSyncing = false;
-    dBagsEl.addEventListener('input', ()=>{ if (dSyncing) return; dSyncing=true; dQtyEl.value = ((Number(dBagsEl.value)||0) * KG_PER_BAG).toString(); dSyncing=false; });
-    dQtyEl.addEventListener('input', ()=>{ if (dSyncing) return; dSyncing=true; dBagsEl.value = kgToBags(Number(dQtyEl.value)||0).toString(); dSyncing=false; });
+    dBagsEl.addEventListener('input', ()=>{ dQtyEl.value = ((Number(dBagsEl.value)||0) * KG_PER_BAG).toString(); });
     document.getElementById('dispatch-form').addEventListener('submit', async (e)=>{
       e.preventDefault();
-      const quantityKg = Number(dQtyEl.value);
-      const quantityBags = Number(dBagsEl.value) || kgToBags(quantityKg);
-      if (!quantityKg || quantityKg<=0){ toast('Please enter a valid quantity','error'); return; }
+      const quantityBags = Number(dBagsEl.value);
+      const quantityKg = quantityBags * KG_PER_BAG;
+      if (!quantityBags || quantityBags<=0){ toast('Please enter a valid quantity','error'); return; }
       const destination = document.getElementById('d-dest').value || 'Main Depot';
       const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
       try{
@@ -2695,9 +2707,9 @@ function generateReportText(){
   text += `${'═'.repeat(35)}\n\n`;
 
   text += `*MAIZE BALANCE*\n`;
-  text += `  Purchased: ${fmtNum(maizeBalance.totalPurchasedKg)} kg\n`;
-  text += `  Dispatched: ${fmtNum(maizeBalance.totalDispatchedKg)} kg\n`;
-  text += `  Balance: ${fmtNum(maizeBalance.balanceKg)} kg\n`;
+  text += `  Purchased: ${fmtBags(maizeBalance.totalPurchasedKg)} bags (${fmtNum(maizeBalance.totalPurchasedKg)} kg)\n`;
+  text += `  Dispatched: ${fmtBags(maizeBalance.totalDispatchedKg)} bags (${fmtNum(maizeBalance.totalDispatchedKg)} kg)\n`;
+  text += `  Balance: ${fmtBags(maizeBalance.balanceKg)} bags (${fmtNum(maizeBalance.balanceKg)} kg)\n`;
   text += `  Total Cost: ZMW ${fmtNum(maizeBalance.totalPurchaseCost)}\n\n`;
 
   text += `*STOCK BALANCES (B/f + Receipts - Issues - Damages = Balance)*\n`;
@@ -2719,7 +2731,7 @@ function generateReportText(){
   if (state.maizePurchases.length>0){
     text += `*RECENT MAIZE PURCHASES*\n`;
     for (const p of state.maizePurchases.slice(0,5)){
-      text += `  ${fmtDate(p.date)} | ${fmtNum(p.quantityKg)}kg @ ZMW${p.pricePerKg}/kg | ${p.supplier}\n`;
+      text += `  ${fmtDate(p.date)} | ${fmtBags(p.quantityKg)} bags (${fmtNum(p.quantityKg)}kg) @ ZMW${p.pricePerKg}/kg | ${p.supplier}\n`;
     }
     text += `\n`;
   }
@@ -2727,7 +2739,7 @@ function generateReportText(){
   if (state.maizeDispatches.length>0){
     text += `*RECENT MAIZE DISPATCHES*\n`;
     for (const dp of state.maizeDispatches.slice(0,5)){
-      text += `  ${fmtDate(dp.date)} | ${fmtNum(dp.quantityKg)}kg to ${dp.destination}`;
+      text += `  ${fmtDate(dp.date)} | ${fmtBags(dp.quantityKg)} bags (${fmtNum(dp.quantityKg)}kg) to ${dp.destination}`;
       if (dp.idtIptNumber) text += ` | IDT/IPT: ${dp.idtIptNumber}`;
       text += `\n`;
     }
