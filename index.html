@@ -433,6 +433,33 @@ function rtdbCompare(a, b){
   return a < b ? -1 : 1;
 }
 
+// Reads the device's actual connection quality (Chromium/WebView-backed
+// browsers - which includes Median's Android wrapper - expose this; plain
+// Safari/older WebViews don't, and fall through to 'unknown'). Used to pick
+// a network budget that matches reality instead of assuming everyone is on
+// a fast, low-latency link.
+function connectionQuality(){
+  const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  return (c && c.effectiveType) || 'unknown'; // 'slow-2g' | '2g' | '3g' | '4g' | 'unknown'
+}
+
+// Picks a timeout/retry budget for a single _fetch call based on that
+// quality. On a real 4G/unknown link we keep the tight, original budget
+// (6s, 1 retry) so a genuinely broken request still fails fast instead of
+// leaving a button stuck on "Creating...". On a slow-2g/2g/3g link the
+// request itself is just going to take longer end-to-end - that's not the
+// same as "broken" - so we widen the timeout and allow extra retries
+// instead of killing a request that would have gone through fine given a
+// couple more seconds.
+function networkBudget(){
+  switch (connectionQuality()){
+    case 'slow-2g': return { timeoutMs: 25000, retries: 3 };
+    case '2g':      return { timeoutMs: 18000, retries: 3 };
+    case '3g':      return { timeoutMs: 12000, retries: 2 };
+    default:        return { timeoutMs: 6000,  retries: 1 }; // '4g' or 'unknown'
+  }
+}
+
 class RTDBClient {
   constructor(config, getAuthToken){
     this.baseUrl = (config.databaseURL || '').replace(/\/$/, '');
@@ -478,29 +505,39 @@ class RTDBClient {
       clearTimeout(timer);
     }
   }
-  async _fetch(path, method='GET', body, timeoutMs=6000, query=null, retries=1){
+  async _fetch(path, method='GET', body, timeoutMs=null, query=null, retries=null){
     // A single weak-signal blip used to surface immediately as a user-facing
     // error (a toast, a stuck button) even though the same request would
     // have gone through fine two seconds later. Retry a transient failure
-    // once with a short backoff before giving up.
+    // with a short backoff before giving up.
     //
-    // Kept deliberately tight (6s timeout, 1 retry -> ~13s worst case)
-    // because every one-shot get/set/query in this app runs synchronously
-    // in front of a UI action (a button that says "Creating...", a status
-    // line that says "Checking..."). The old defaults (12s timeout, 3
-    // retries, backoff up to 6s) meant a single foreground action could
-    // legitimately take ~40s to fail on a weak connection, which reads as
-    // "hung" to the person tapping the button long before the error ever
-    // surfaces. Live listeners (onSnapshot/_sse) are unaffected - those
-    // reconnect on their own schedule and don't go through this method.
+    // The timeout/retry budget adapts to the device's actual connection
+    // quality (see networkBudget() above) instead of using one fixed
+    // number for everyone. On 4G/unknown it's kept deliberately tight (6s
+    // timeout, 1 retry -> ~13s worst case) because every one-shot
+    // get/set/query in this app runs synchronously in front of a UI action
+    // (a button that says "Creating...", a status line that says
+    // "Checking..."), and a genuinely broken request should fail fast
+    // rather than reading as "hung". On slow-2g/2g/3g the budget widens
+    // (up to ~25s timeout, 3 retries) because on those links normal
+    // requests really do take longer - that's not the same failure mode as
+    // "broken", and killing them at the 4G budget would make sync
+    // unreliable for exactly the people who need it most. Callers can
+    // still pass an explicit timeoutMs/retries to override this (e.g. a
+    // caller that wants the old fixed behavior regardless of connection).
+    // Live listeners (onSnapshot/_sse) are unaffected - those reconnect on
+    // their own schedule and don't go through this method.
+    const budget = (timeoutMs == null || retries == null) ? networkBudget() : null;
+    const effectiveTimeout = timeoutMs != null ? timeoutMs : budget.timeoutMs;
+    const effectiveRetries = retries != null ? retries : budget.retries;
     let attempt = 0;
     for (;;) {
       try {
-        return await this._fetchOnce(path, method, body, timeoutMs, query);
+        return await this._fetchOnce(path, method, body, effectiveTimeout, query);
       } catch (e) {
-        if (!e.retryable || attempt >= retries) throw e;
+        if (!e.retryable || attempt >= effectiveRetries) throw e;
         attempt++;
-        const backoff = Math.min(800 * 2 ** (attempt - 1), 1500) + Math.random() * 300;
+        const backoff = Math.min(800 * 2 ** (attempt - 1), 2500) + Math.random() * 300;
         await new Promise(r => setTimeout(r, backoff));
       }
     }
@@ -596,9 +633,14 @@ class RTDBQuery {
       try { onNext(await this.get()); gotFirst = true; } catch (e) { if (onError) onError(e); }
     };
     this.client._sse(this.path, applySnapshot, this._restQuery(), onOpen).then(unsub => { stopped ? unsub() : (unsubSSE = unsub); });
+    // On a slow-2g/2g/3g link the SSE stream's first event can legitimately
+    // take longer to arrive than on 4G - firing the fallback REST fetch too
+    // early just doubles up on an already-constrained connection. Scale the
+    // grace period with the same connection-quality read _fetch uses.
+    const fallbackDelay = { 'slow-2g': 20000, '2g': 15000, '3g': 11000 }[connectionQuality()] || 8000;
     const fallbackTimer = setTimeout(() => {
       if (!stopped && !gotFirst) applySnapshot();
-    }, 8000);
+    }, fallbackDelay);
     return () => { stopped = true; clearTimeout(fallbackTimer); if (unsubSSE) unsubSSE(); };
   }
 }
@@ -823,6 +865,43 @@ function friendlyAuthError(err){
 }
 
 /* ----------------------------- Auth / Login ----------------------------- */
+// "Stay logged in on this device" controls where the session is persisted:
+// checked (the default, and the only behavior this app had before) keeps
+// it in localStorage, which survives closing the app/browser entirely.
+// Unchecked keeps it in sessionStorage instead, which is cleared as soon as
+// the tab/app is closed - for shared devices (SDCs often hand a single
+// phone or tablet between clerks at a depot) where the next person
+// shouldn't land in someone else's account. Only one of the two ever holds
+// a session at a time, so checking localStorage first is enough to find it.
+const AUTH_KEY = 'depot-auth';
+function saveAuthSession(user, remember){
+  const json = JSON.stringify(user);
+  if (remember){
+    localStorage.setItem(AUTH_KEY, json);
+    sessionStorage.removeItem(AUTH_KEY);
+  } else {
+    sessionStorage.setItem(AUTH_KEY, json);
+    localStorage.removeItem(AUTH_KEY);
+  }
+}
+function loadAuthSession(){
+  return localStorage.getItem(AUTH_KEY) || sessionStorage.getItem(AUTH_KEY);
+}
+function clearAuthSession(){
+  localStorage.removeItem(AUTH_KEY);
+  sessionStorage.removeItem(AUTH_KEY);
+}
+// Re-saves the signed-in user's current data (e.g. after createDepot adds a
+// depotId) to whichever storage the session already lives in, so a mid-
+// session update never silently overrides the person's original "stay
+// logged in" choice by writing to the wrong storage.
+function persistCurrentUser(){
+  if (!state.user) return;
+  const json = JSON.stringify(state.user);
+  if (localStorage.getItem(AUTH_KEY) !== null) localStorage.setItem(AUTH_KEY, json);
+  else sessionStorage.setItem(AUTH_KEY, json);
+}
+
 async function ensureAnonAuth(){
   if (!auth.currentUser) {
     await auth.signInAnonymously();
@@ -835,7 +914,7 @@ async function fetchDepotsById(ids){
   return all.docs.map(d=>({id:d.id, ...d.data()})).filter(d=>ids.includes(d.id));
 }
 
-async function login(username, password){
+async function login(username, password, remember=true){
   await ensureAnonAuth();
   const snap = await db.collection('users').where('username','==',username).limit(1).get();
   if (snap.empty) throw new Error('Invalid username or password');
@@ -845,7 +924,7 @@ async function login(username, password){
   if (u.password !== password) throw new Error('Invalid username or password');
   const user = { id: doc.id, username: u.username, name: u.name, role: u.role, phone: u.phone || null, depotId: u.depotId || null, depotIds: u.depotIds || null };
   state.user = user;
-  localStorage.setItem('depot-auth', JSON.stringify(user));
+  saveAuthSession(user, remember);
   await loadDepotsForUser();
   return user;
 }
@@ -899,7 +978,7 @@ async function switchDepot(depotId){
   render();
 }
 
-async function signup(username, password, name, phone, depotChoice){
+async function signup(username, password, name, phone, depotChoice, remember=true){
   await ensureAnonAuth();
 
   if (!username || !password || !name) throw new Error('Please fill in all required fields.');
@@ -925,7 +1004,7 @@ async function signup(username, password, name, phone, depotChoice){
 
   await newUserRef.set(userData);
   state.user = user;
-  localStorage.setItem('depot-auth', JSON.stringify(user));
+  saveAuthSession(user, remember);
   await loadDepotsForUser();
   return user;
 }
@@ -1049,7 +1128,7 @@ async function createDepot(name, location){
   const newDepotIds = [...(state.user.depotIds || []), depotRef.id];
   await db.collection('users').doc(state.user.id).update({ depotIds: newDepotIds });
   state.user.depotIds = newDepotIds;
-  localStorage.setItem('depot-auth', JSON.stringify(state.user));
+  persistCurrentUser();
   await loadDepotsForUser();
   state.allDepotsSummary = null; // stale now that a new depot exists - reload on next view
   return depotRef.id;
@@ -1068,7 +1147,7 @@ function logout(){
   state.currentDepotId = null;
   state.allDepotsSummary = null;
   state.dashboardScope = 'current';
-  localStorage.removeItem('depot-auth');
+  clearAuthSession();
   localStorage.removeItem('depot-current-id');
   render();
 }
@@ -1474,6 +1553,10 @@ function renderLoginForm(){
           <label class="label">Password</label>
           <input class="input" id="login-password" type="password" placeholder="Enter your password" required autocomplete="current-password">
         </div>
+        <label class="flex items-center gap-2 text-sm text-gray-600">
+          <input type="checkbox" id="login-remember" checked>
+          Stay logged in on this device
+        </label>
         <button type="submit" id="login-btn" class="btn btn-primary w-full py-2.5">Sign In</button>
       </form>`;
 }
@@ -1515,9 +1598,10 @@ function attachLoginEvents(){
       const btn = document.getElementById('login-btn');
       const username = document.getElementById('login-username').value.trim();
       const password = document.getElementById('login-password').value;
+      const remember = document.getElementById('login-remember').checked;
       btn.disabled = true; btn.textContent = 'Signing in...';
       try{
-        const user = await login(username, password);
+        const user = await login(username, password, remember);
         toast(`Welcome, ${user.name}!`);
         await startRealtimeSync();
         render();
@@ -3426,7 +3510,7 @@ function attachSettingsEvents(){
 /* ------------------------------- Bootstrap ------------------------------- */
 (async function init(){
   if (!LIBS_OK || window.__depotLibFailed) return;
-  const saved = localStorage.getItem('depot-auth');
+  const saved = loadAuthSession();
   if (saved){
     try{
       state.user = JSON.parse(saved);
