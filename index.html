@@ -96,10 +96,112 @@
   #sidebar{transition:transform .2s ease;}
   .nav-item{display:flex;align-items:center;gap:0.7rem;padding:0.55rem 0.75rem;border-radius:0.55rem;font-size:0.875rem;font-weight:500;color:#6b7280;cursor:pointer;}
   .nav-item:hover{color:#111827;background:#f3f4f6;}
-  .nav-item.active{background:#ecfdf5;color:#065f46;font-weight:600;}
+  .nav-item.active{background:#FEF3C7;color:#78350F;font-weight:600;}
+
+  /* ── Amber/Gold Depot Theme (merged from Satellite Depot Manager v3) ── */
+  :root{ --emerald:#B45309; --emerald-dark:#92400E; }
+  h1,h2,h3{ font-family: Georgia, "Times New Roman", serif; }
+  .bg-emerald-50{background-color:#FFFBEB!important;}
+  .bg-emerald-100{background-color:#FEF3C7!important;}
+  .bg-emerald-700{background-color:#B45309!important;}
+  .text-emerald-600{color:#B45309!important;}
+  .text-emerald-700{color:#92400E!important;}
+  .text-emerald-800,.text-emerald-900{color:#78350F!important;}
+  .border-emerald-600{border-color:#EAB308!important;}
+  .toast.success{background:#92400E;}
+  #splash{
+    position:fixed; inset:0; z-index:2000;
+    background: linear-gradient(160deg, #78350F 0%, #92400E 30%, #B45309 60%, #EAB308 100%);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:#fff; text-align:center; padding:24px;
+    transition: opacity .5s ease, transform .5s ease;
+  }
+  #splash.hide{ opacity:0; transform:scale(1.05); pointer-events:none; }
+  #splash .logo-ring{
+    width:90px; height:90px; border-radius:50%;
+    border:4px solid rgba(255,255,255,.35);
+    display:flex; align-items:center; justify-content:center;
+    margin-bottom:18px; background: rgba(255,255,255,.1);
+  }
+  #splash .logo-ring svg{ width:46px; height:46px; fill:#FDE047; }
+  #splash h1{ font-size:26px; margin:0 0 4px 0; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.25); }
+  #splash .tagline{ font-size:13px; color:rgba(255,255,255,.8); margin-bottom:24px; font-style:italic; }
+  #splash .features{
+    display:grid; grid-template-columns:1fr 1fr; gap:10px;
+    max-width:340px; width:100%; text-align:left; margin-bottom:8px;
+  }
+  #splash .feat{
+    background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2);
+    border-radius:10px; padding:12px 10px; backdrop-filter: blur(4px);
+  }
+  #splash .feat .icon{ font-size:22px; margin-bottom:4px; }
+  #splash .feat .ft{ font-size:12.5px; font-weight:700; margin-bottom:2px; }
+  #splash .feat .fd{ font-size:10.5px; color:rgba(255,255,255,.7); line-height:1.3; }
+  #splash .enter-btn{
+    margin-top:20px; padding:11px 32px; border:2px solid #FDE047;
+    border-radius:30px; background:transparent; color:#FDE047;
+    font-size:15px; font-weight:700; cursor:pointer;
+    transition: background .2s, color .2s, transform .1s;
+  }
+  #splash .enter-btn:hover, #splash .enter-btn:active{ background:#FDE047; color:#78350F; transform:scale(.97); }
+  #splash .footnote{ margin-top:14px; font-size:10px; color:rgba(255,255,255,.5); }
 </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
+
+<div id="splash">
+  <div class="logo-ring">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18l7 3.5v7.64l-7 3.5-7-3.5V7.68l7-3.5zM12 6a4 4 0 100 8 4 4 0 000-8zm0 2a2 2 0 110 4 2 2 0 010-4zm-5 9.5c0-1.38 2.24-2.5 5-2.5s5 1.12 5 2.5v1.5H7v-1.5z"/></svg>
+  </div>
+  <h1>Satellite Depot Manager</h1>
+  <div class="tagline">Complete depot management solution</div>
+  <div class="features">
+    <div class="feat">
+      <div class="icon">&#127806;</div>
+      <div class="ft">Maize Tracking</div>
+      <div class="fd">Purchases &amp; dispatches with PRCN, IDT/IPT and driver details</div>
+    </div>
+    <div class="feat">
+      <div class="icon">&#129295;</div>
+      <div class="ft">Stock &amp; Equipment</div>
+      <div class="fd">Receipts, issues and damages per item, with live balances</div>
+    </div>
+    <div class="feat">
+      <div class="icon">&#128119;</div>
+      <div class="ft">Personnel &amp; Accounts</div>
+      <div class="fd">SDC, guards and casual staff across every depot</div>
+    </div>
+    <div class="feat">
+      <div class="icon">&#128176;</div>
+      <div class="ft">Payroll Calculator</div>
+      <div class="fd">Salary/hourly labor payments plus K-per-bag payroll for loaders &amp; stitchers</div>
+    </div>
+    <div class="feat">
+      <div class="icon">&#128202;</div>
+      <div class="ft">Reports</div>
+      <div class="fd">Generate period reports, copy or share via WhatsApp</div>
+    </div>
+    <div class="feat">
+      <div class="icon">&#128274;</div>
+      <div class="ft">Secure &amp; Multi-Depot</div>
+      <div class="fd">Live sync across devices, manager and depot-level accounts</div>
+    </div>
+  </div>
+  <button class="enter-btn" id="enterAppBtn">Enter App</button>
+  <div class="footnote">Nexlite Digital Solutions</div>
+</div>
+<script>
+(function(){
+  var splash = document.getElementById('splash');
+  var enterBtn = document.getElementById('enterAppBtn');
+  function dismiss(){
+    splash.classList.add('hide');
+    setTimeout(function(){ splash.style.display = 'none'; }, 550);
+  }
+  enterBtn.addEventListener('click', dismiss);
+  document.addEventListener('keydown', function handler(){ dismiss(); document.removeEventListener('keydown', handler); });
+})();
+</script>
 
 <div id="toast-wrap" class="toast-wrap"></div>
 <div id="root"></div>
@@ -570,6 +672,10 @@ const state = {
   maizeDispatches: [],
   personnel: [],
   laborPayments: [],
+  payRates: [],
+  payrollWorkers: [],
+  payrollEntries: [],
+  maizeDamagedBags: [],
   loading: false,
   charts: {},
   listeners: [],
@@ -587,6 +693,7 @@ const NAV_ITEMS = [
   { page: 'personnel', label: 'Personnel', icon: iconUsers(), managerOnly: true },
   { page: 'accounts', label: 'SDC Accounts', icon: iconUsers(), managerOnly: true },
   { page: 'labor-payments', label: 'Labor Payments', icon: iconCash(), managerOnly: true },
+  { page: 'payroll', label: 'Payroll (Bag Rates)', icon: iconWheat2(), managerOnly: true },
   { page: 'depots', label: 'Depots', icon: iconTruck(), managerOnly: true },
   { page: 'reports', label: 'Reports & WhatsApp', icon: iconChart(), managerOnly: false },
   { page: 'settings', label: 'Settings', icon: iconSettings(), managerOnly: false },
@@ -689,6 +796,7 @@ function iconChart(){ return svgIcon('<path d="M3 3v18h18"/><path d="M18 17V9"/>
 function iconPlus(){ return svgIcon('<path d="M12 5v14M5 12h14"/>'); }
 function iconRefresh(){ return svgIcon('<path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>'); }
 function iconWheat(){ return svgIcon('<path d="M12 22V2"/><path d="M17 8c0 2-2 3-5 3s-5-1-5-3 2-4 5-4 5 2 5 4z"/><path d="M17 14c0 2-2 3-5 3s-5-1-5-3 2-4 5-4 5 2 5 4z"/>', 'style="width:2rem;height:2rem;"'); }
+function iconWheat2(){ return svgIcon('<path d="M12 22V2"/><path d="M17 8c0 2-2 3-5 3s-5-1-5-3 2-4 5-4 5 2 5 4z"/><path d="M17 14c0 2-2 3-5 3s-5-1-5-3 2-4 5-4 5 2 5 4z"/>'); }
 function iconMenu(){ return svgIcon('<path d="M3 12h18M3 6h18M3 18h18"/>'); }
 function iconX(){ return svgIcon('<path d="M18 6L6 18M6 6l12 12"/>'); }
 function iconLogout(){ return svgIcon('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>'); }
@@ -1011,6 +1119,10 @@ const SYNC_COLLECTIONS = [
   { name: 'maizeDispatches',   stateKey: 'maizeDispatches',   orderField: 'date', desc: true },
   { name: 'personnel',         stateKey: 'personnel',         orderField: 'name' },
   { name: 'laborPayments',     stateKey: 'laborPayments',     orderField: 'date', desc: true },
+  { name: 'payRates',          stateKey: 'payRates',          orderField: 'crop' },
+  { name: 'payrollWorkers',    stateKey: 'payrollWorkers',    orderField: 'name' },
+  { name: 'payrollEntries',    stateKey: 'payrollEntries',    orderField: 'date', desc: true },
+  { name: 'maizeDamagedBags',  stateKey: 'maizeDamagedBags',  orderField: 'date', desc: true },
 ];
 
 function startRealtimeSync(){
@@ -1553,6 +1665,7 @@ async function renderPageContent(){
     case 'personnel': body = renderPersonnel(); break;
     case 'accounts': body = renderAccounts(); break;
     case 'labor-payments': body = renderLaborPayments(); break;
+    case 'payroll': body = renderPayroll(); break;
     case 'depots': body = renderDepots(); break;
     case 'reports': body = renderReports(); break;
     case 'settings': body = renderSettings(); break;
@@ -1566,6 +1679,7 @@ async function renderPageContent(){
     case 'personnel': attachPersonnelEvents(); break;
     case 'accounts': attachAccountsEvents(); break;
     case 'labor-payments': attachLaborPaymentsEvents(); break;
+    case 'payroll': attachPayrollEvents(); break;
     case 'depots': attachDepotsEvents(); break;
     case 'reports': attachReportsEvents(); break;
     case 'settings': attachSettingsEvents(); break;
@@ -1592,6 +1706,7 @@ async function renderPageAfterFetch(){
     case 'personnel': body = renderPersonnel(); break;
     case 'accounts': body = renderAccounts(); break;
     case 'labor-payments': body = renderLaborPayments(); break;
+    case 'payroll': body = renderPayroll(); break;
     case 'depots': body = renderDepots(); break;
     case 'reports': body = renderReports(); break;
     case 'settings': body = renderSettings(); break;
@@ -1605,6 +1720,7 @@ async function renderPageAfterFetch(){
     case 'personnel': attachPersonnelEvents(); break;
     case 'accounts': attachAccountsEvents(); break;
     case 'labor-payments': attachLaborPaymentsEvents(); break;
+    case 'payroll': attachPayrollEvents(); break;
     case 'depots': attachDepotsEvents(); break;
     case 'reports': attachReportsEvents(); break;
     case 'settings': attachSettingsEvents(); break;
@@ -2163,6 +2279,47 @@ function renderMaizePurchases(){
         </table>
       </div>
     </div>
+    <div class="card p-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+        <div><h3 class="text-base font-semibold">Damaged Empty Bags</h3><p class="text-xs text-gray-500">Torn/unusable empty grain bags, logged separately from stock</p></div>
+        <button id="new-damaged-bag-btn" class="btn btn-outline text-xs py-1.5">${iconPlus()} Record Damaged Bags</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="datatable">
+          <thead><tr><th>Date</th><th class="text-right">Bags</th><th>Note</th><th>By</th></tr></thead>
+          <tbody>
+            ${state.maizeDamagedBags.length===0 ? '<tr><td colspan="4" class="text-center py-6 text-gray-400">No damaged bags recorded</td></tr>' : state.maizeDamagedBags.map(d=>`
+              <tr>
+                <td class="text-xs">${fmtDate(d.date)}</td>
+                <td class="text-right font-semibold text-rose-700">${fmtNum(d.bags)}</td>
+                <td class="text-xs text-gray-500">${esc(d.note)||'-'}</td>
+                <td class="text-xs">${esc(d.createdByName)||'-'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function damagedBagModal(){
+  return `
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold mb-1">Record Damaged Bags</h3>
+      <p class="text-sm text-gray-500 mb-4">Torn or unusable empty grain bags (not a stock item transaction).</p>
+      <form id="damaged-bag-form" class="space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="label">Bags Damaged *</label><input class="input" type="number" min="1" step="1" id="db-bags" required></div>
+          <div><label class="label">Date *</label><input class="input" type="date" id="db-date" value="${todayStr()}" required></div>
+        </div>
+        <div><label class="label">Reason / Note</label><input class="input" id="db-note" placeholder="e.g. Torn during offloading, rodent damage"></div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-submit">Save</button>
+        </div>
+      </form>
+    </div>
   </div>`;
 }
 
@@ -2231,6 +2388,29 @@ function attachMaizePurchasesEvents(){
         closeModal();
         await refreshCurrentPage();
       } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Save Purchase'; }
+    });
+  });
+  const damagedBtn = document.getElementById('new-damaged-bag-btn');
+  if (damagedBtn) damagedBtn.addEventListener('click', ()=>{
+    document.getElementById('modal-root').innerHTML = damagedBagModal();
+    bindModalClose();
+    document.getElementById('damaged-bag-form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const bags = Number(document.getElementById('db-bags').value);
+      if (!bags || bags<=0){ toast('Please enter a valid number of bags','error'); return; }
+      const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
+      try{
+        await db.collection('maizeDamagedBags').add({
+          date: document.getElementById('db-date').value,
+          bags, note: document.getElementById('db-note').value || null,
+          depotId: state.currentDepotId,
+          createdById: state.user.id, createdByName: state.user.name,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        toast(`${bags} damaged bags recorded`);
+        closeModal();
+        await refreshCurrentPage();
+      } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Save'; }
     });
   });
 }
@@ -2733,6 +2913,305 @@ function attachLaborPaymentsEvents(){
         closeModal();
         await refreshCurrentPage();
       } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Save Payment'; }
+    });
+  });
+}
+
+/* ============================ PAYROLL (BAG RATES) ============================
+   Merged in from "Satellite Depot Manager v3": a bag-based wage calculator
+   for casual loaders/stitchers/weighers, separate from the salary/hourly
+   Labor Payments above. A worker logs bags handled on a given task, the
+   system looks up the K-per-bag rate for that task, and computes the wage. */
+const TASK_CATEGORIES = ['Loader','Stitcher','Weigher'];
+let payrollWorkerFilter = 'all';
+
+function payRateFor(taskCategory){
+  const r = state.payRates.find(r=>r.taskCategory===taskCategory);
+  return r ? r.ratePerBag : 0;
+}
+function payrollWorkerById(id){ return state.payrollWorkers.find(w=>w.id===id); }
+function payrollEntryAmount(entry){
+  return Number(entry.bags||0) * Number(entry.rate||0);
+}
+
+function renderPayroll(){
+  const activeWorkers = state.payrollWorkers.filter(w=>w.isActive!==false);
+  const filteredEntries = payrollWorkerFilter==='all' ? state.payrollEntries : state.payrollEntries.filter(e=>e.workerId===payrollWorkerFilter);
+  const totalOwed = state.payrollEntries.filter(e=>!e.paid).reduce((s,e)=>s+payrollEntryAmount(e),0);
+  const totalPaidOut = state.payrollEntries.filter(e=>e.paid).reduce((s,e)=>s+payrollEntryAmount(e),0);
+
+  return `
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div><h2 class="text-2xl font-bold">Payroll (Bag Rates)</h2><p class="text-sm text-gray-500">K-per-bag wages for loaders, stitchers &amp; weighers</p></div>
+      <div class="flex gap-2">
+        <button id="refresh-btn" class="btn btn-outline">${iconRefresh()} Refresh</button>
+        <button id="new-payroll-entry-btn" class="btn btn-primary">${iconPlus()} Log Bags Worked</button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Wages Outstanding</p><p class="text-2xl font-bold mt-1">ZMW ${fmtNum(totalOwed)}</p></div>
+      <div class="card p-4"><p class="text-xs text-gray-500 font-medium uppercase">Paid Out (all-time)</p><p class="text-2xl font-bold mt-1">ZMW ${fmtNum(totalPaidOut)}</p></div>
+    </div>
+
+    <div class="card p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-semibold">Pay Rates (K per bag)</h3>
+        <button id="edit-rates-btn" class="btn btn-outline text-xs py-1.5">Edit Rates</button>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        ${TASK_CATEGORIES.map(t=>`
+          <div class="rounded-lg bg-amber-50 border border-amber-100 p-3 text-center">
+            <p class="text-xs text-gray-500 uppercase">${t}</p>
+            <p class="text-lg font-bold mt-1">K ${fmtNum(payRateFor(t))}</p>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="card p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-semibold">Workers</h3>
+        <button id="new-worker-btn" class="btn btn-outline text-xs py-1.5">${iconPlus()} Add Worker</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="datatable">
+          <thead><tr><th>Name</th><th>Role</th><th>NRC</th><th>Phone</th><th>Status</th></tr></thead>
+          <tbody>
+            ${state.payrollWorkers.length===0 ? '<tr><td colspan="5" class="text-center py-6 text-gray-400">No workers added yet</td></tr>' : state.payrollWorkers.map(w=>`
+              <tr>
+                <td class="font-medium">${esc(w.name)}</td>
+                <td><span class="badge border border-gray-300 text-gray-700">${esc(w.role)}</span></td>
+                <td class="text-xs">${esc(w.nrc)||'-'}</td>
+                <td class="text-xs">${esc(w.phone)||'-'}</td>
+                <td class="text-xs">${w.isActive!==false ? '<span class="text-emerald-600">Active</span>' : '<span class="text-gray-400">Inactive</span>'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card p-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+        <h3 class="text-base font-semibold">Bags Logged</h3>
+        <select id="payroll-worker-filter" class="input text-xs" style="width:auto;">
+          <option value="all">All Workers</option>
+          ${activeWorkers.map(w=>`<option value="${w.id}" ${payrollWorkerFilter===w.id?'selected':''}>${esc(w.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="datatable">
+          <thead><tr><th>Date</th><th>Worker</th><th>Task</th><th class="text-right">Bags</th><th class="text-right">Rate</th><th class="text-right">Amount</th><th>Paid</th></tr></thead>
+          <tbody>
+            ${filteredEntries.length===0 ? '<tr><td colspan="7" class="text-center py-8 text-gray-400">No entries logged yet</td></tr>' : filteredEntries.map(e=>{
+              const w = payrollWorkerById(e.workerId);
+              return `<tr>
+                <td class="text-xs">${fmtDate(e.date)}</td>
+                <td class="font-medium">${esc(w?w.name:'Unknown')}</td>
+                <td><span class="badge border border-gray-300 text-gray-700">${esc(e.taskCategory)}</span></td>
+                <td class="text-right">${fmtNum(e.bags)}</td>
+                <td class="text-right">K${fmtNum(e.rate)}</td>
+                <td class="text-right font-semibold">K${fmtNum(payrollEntryAmount(e))}</td>
+                <td>${e.paid
+                  ? '<span class="text-emerald-600 text-xs font-medium">Paid</span>'
+                  : `<button class="btn btn-outline text-xs py-1 px-2" data-mark-paid="${e.id}">Mark Paid</button>`}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function payRatesModal(){
+  return `
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold mb-1">Edit Pay Rates</h3>
+      <p class="text-sm text-gray-500 mb-4">K (Kwacha) paid per bag handled, by task category.</p>
+      <form id="rates-form" class="space-y-4">
+        ${TASK_CATEGORIES.map(t=>`
+          <div><label class="label">${t} (K per bag)</label>
+          <input class="input" type="number" min="0" step="0.01" id="rate-${t}" value="${payRateFor(t)}"></div>
+        `).join('')}
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-submit">Save Rates</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
+function payrollWorkerModal(){
+  return `
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold mb-1">Add Worker</h3>
+      <p class="text-sm text-gray-500 mb-4">Loaders, stitchers &amp; weighers paid per bag handled.</p>
+      <form id="worker-form" class="space-y-4">
+        <div><label class="label">Full Name *</label><input class="input" id="w-name" required></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="label">Role *</label>
+            <select class="input" id="w-role" required>
+              <option value="Loader">Loader</option>
+              <option value="Stitcher">Stitcher</option>
+              <option value="Weigher">Weigher</option>
+              <option value="Both">Both (Loader &amp; Stitcher)</option>
+              <option value="All-round">All-round</option>
+            </select>
+          </div>
+          <div><label class="label">NRC No.</label><input class="input" id="w-nrc" placeholder="e.g. 123456/78/9"></div>
+        </div>
+        <div><label class="label">Phone</label><input class="input" type="tel" id="w-phone" placeholder="e.g. 0977123456"></div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-submit">Save Worker</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
+function payrollEntryModal(){
+  const activeWorkers = state.payrollWorkers.filter(w=>w.isActive!==false);
+  return `
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold mb-1">Log Bags Worked</h3>
+      <p class="text-sm text-gray-500 mb-4">Wage is auto-calculated from the pay rate for the task.</p>
+      <form id="payroll-entry-form" class="space-y-4">
+        <div><label class="label">Worker *</label>
+          <select class="input" id="pe-worker" required>
+            <option value="">Select worker</option>
+            ${activeWorkers.map(w=>`<option value="${w.id}">${esc(w.name)} (${esc(w.role)})</option>`).join('')}
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="label">Task *</label>
+            <select class="input" id="pe-task" required>
+              ${TASK_CATEGORIES.map(t=>`<option value="${t}">${t} (K${fmtNum(payRateFor(t))}/bag)</option>`).join('')}
+            </select>
+          </div>
+          <div><label class="label">Bags *</label><input class="input" type="number" min="1" step="1" id="pe-bags" required></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="label">Date *</label><input class="input" type="date" id="pe-date" value="${todayStr()}" required></div>
+          <div><label class="label">Amount</label><div class="rounded-lg bg-gray-50 p-2.5 text-sm" id="pe-autocalc">K0.00</div></div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="btn btn-outline" id="modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-submit">Save Entry</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
+function attachPayrollEvents(){
+  document.getElementById('refresh-btn').addEventListener('click', refreshCurrentPage);
+
+  const filterSel = document.getElementById('payroll-worker-filter');
+  if (filterSel) filterSel.addEventListener('change', e=>{ payrollWorkerFilter = e.target.value; renderPageAfterFetch(); });
+
+  document.querySelectorAll('[data-mark-paid]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.dataset.markPaid;
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try{
+        await db.collection('payrollEntries').doc(id).update({ paid: true, paidAt: FieldValue.serverTimestamp() });
+        toast('Marked as paid');
+        await refreshCurrentPage();
+      } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Mark Paid'; }
+    });
+  });
+
+  document.getElementById('edit-rates-btn').addEventListener('click', ()=>{
+    document.getElementById('modal-root').innerHTML = payRatesModal();
+    bindModalClose();
+    document.getElementById('rates-form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
+      try{
+        for (const t of TASK_CATEGORIES){
+          const ratePerBag = Number(document.getElementById(`rate-${t}`).value) || 0;
+          const existing = state.payRates.find(r=>r.taskCategory===t);
+          if (existing){
+            await db.collection('payRates').doc(existing.id).update({ ratePerBag });
+          } else {
+            await db.collection('payRates').add({
+              taskCategory: t, ratePerBag, depotId: state.currentDepotId,
+              createdById: state.user.id, createdByName: state.user.name,
+              createdAt: FieldValue.serverTimestamp(),
+            });
+          }
+        }
+        toast('Pay rates updated');
+        closeModal();
+        await refreshCurrentPage();
+      } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Save Rates'; }
+    });
+  });
+
+  document.getElementById('new-worker-btn').addEventListener('click', ()=>{
+    document.getElementById('modal-root').innerHTML = payrollWorkerModal();
+    bindModalClose();
+    document.getElementById('worker-form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const name = document.getElementById('w-name').value.trim();
+      if (!name){ toast('Please enter a name','error'); return; }
+      const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
+      try{
+        await db.collection('payrollWorkers').add({
+          name, role: document.getElementById('w-role').value,
+          nrc: document.getElementById('w-nrc').value.trim() || null,
+          phone: document.getElementById('w-phone').value.trim() || null,
+          isActive: true, depotId: state.currentDepotId,
+          createdById: state.user.id, createdByName: state.user.name,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        toast(`${name} added`);
+        closeModal();
+        await refreshCurrentPage();
+      } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Save Worker'; }
+    });
+  });
+
+  document.getElementById('new-payroll-entry-btn').addEventListener('click', ()=>{
+    document.getElementById('modal-root').innerHTML = payrollEntryModal();
+    bindModalClose();
+    const workerSel = document.getElementById('pe-worker');
+    const taskSel = document.getElementById('pe-task');
+    const bagsInput = document.getElementById('pe-bags');
+    const autocalc = document.getElementById('pe-autocalc');
+    const updateCalc = ()=>{
+      const rate = payRateFor(taskSel.value);
+      autocalc.textContent = 'K' + fmtNum((Number(bagsInput.value)||0) * rate);
+    };
+    taskSel.addEventListener('change', updateCalc);
+    bagsInput.addEventListener('input', updateCalc);
+    updateCalc();
+    document.getElementById('payroll-entry-form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const workerId = workerSel.value;
+      const bags = Number(bagsInput.value);
+      if (!workerId || !bags || bags<=0){ toast('Please fill all required fields','error'); return; }
+      const taskCategory = taskSel.value;
+      const rate = payRateFor(taskCategory);
+      const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Saving...';
+      try{
+        await db.collection('payrollEntries').add({
+          workerId, taskCategory, bags, rate, paid: false,
+          date: document.getElementById('pe-date').value,
+          depotId: state.currentDepotId,
+          createdById: state.user.id, createdByName: state.user.name,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        toast(`Logged ${bags} bags for ${taskCategory}`);
+        closeModal();
+        await refreshCurrentPage();
+      } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Save Entry'; }
     });
   });
 }
