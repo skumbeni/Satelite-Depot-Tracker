@@ -559,6 +559,105 @@ class RTDBClient {
   batch(){ return new RTDBBatch(this); }
 }
 
+/* --------------------------- Offline write queue ---------------------------
+   Every set/update/delete/add in the app funnels through queuedWrite()
+   below. Previously a write that couldn't reach the server (offline, or a
+   timeout on a weak connection) threw straight back to the caller - which
+   is the "internet connection required" error that kept surfacing even
+   after read paths were made resilient. This mirrors the pattern used in
+   MyDepotMaster: a write is first attempted live; if that fails for a
+   connectivity reason, it's saved to a durable local queue instead of
+   being lost, and a background flush - serialized so writes apply in the
+   exact order they were made, the same role MDM's _fbSerial/_fbOpChain
+   mutex plays - drains that queue the moment a connection is available.
+   The caller always gets a normal successful resolution; the record's own
+   onSnapshot listener picks up the confirmed write once it lands, the same
+   way it would pick up a change made from another device.
+   ---------------------------------------------------------------------- */
+const WRITE_QUEUE_KEY = 'depot-write-queue';
+
+function loadWriteQueue(){
+  try { return JSON.parse(localStorage.getItem(WRITE_QUEUE_KEY) || '[]'); }
+  catch(e){ return []; }
+}
+function saveWriteQueue(q){
+  try { localStorage.setItem(WRITE_QUEUE_KEY, JSON.stringify(q)); }
+  catch(e){ /* storage full/unavailable - the write already landed live in this case, so nothing is lost */ }
+}
+function pendingWriteCount(){
+  return loadWriteQueue().length;
+}
+
+async function queuedWrite(client, method, path, body){
+  try {
+    return await client._fetch(path, method, body);
+  } catch (e) {
+    // A real rejection (bad data, permission denied, validation failure) -
+    // retrying identical bytes will never succeed, so surface it exactly
+    // like before rather than queuing a write that can only fail again.
+    if (e.retryable === false) throw e;
+    const q = loadWriteQueue();
+    q.push({ method, path, body, queuedAt: Date.now() });
+    saveWriteQueue(q);
+    scheduleFlush(client);
+    return null;
+  }
+}
+
+let _flushMutex = false;   // only one flush drains the queue at a time, and strictly in order
+let _flushScheduled = false;
+function scheduleFlush(client, delayMs = 300){
+  if (_flushScheduled) return;
+  _flushScheduled = true;
+  setTimeout(() => { _flushScheduled = false; flushWriteQueue(client); }, delayMs);
+}
+async function flushWriteQueue(client){
+  if (_flushMutex) return;
+  _flushMutex = true;
+  try {
+    while (true) {
+      const q = loadWriteQueue();
+      if (!q.length) break;
+      const entry = q[0];
+      try {
+        await client._fetch(entry.path, entry.method, entry.body);
+      } catch (e) {
+        if (e.retryable === false) {
+          // A queued write that's now a genuine rejection (e.g. the data
+          // became invalid in the meantime) - drop it rather than let it
+          // block every write queued behind it forever, and let the
+          // person know.
+          reportSyncError('a queued change couldn\'t be saved', e);
+        } else {
+          // Still can't reach the server - stop for now; the 'online'
+          // event, the periodic retry, and the next app launch will all
+          // try again.
+          break;
+        }
+      }
+      const after = loadWriteQueue();
+      after.shift();
+      saveWriteQueue(after);
+      // Keep the "N changes waiting to sync" banner honest as the queue
+      // drains, the same way live collection updates already repaint the
+      // page in startRealtimeSync().
+      if (typeof state !== 'undefined' && state.user && state.dataReady) {
+        try { renderPageAfterFetch(); } catch(e){}
+      }
+    }
+  } finally {
+    _flushMutex = false;
+  }
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => { if (typeof db !== 'undefined' && db) flushWriteQueue(db); });
+  // Belt-and-suspenders: the 'online' event doesn't always fire reliably on
+  // flaky mobile connections that hover at the edge of connectivity rather
+  // than cleanly dropping and reconnecting - a periodic retry catches those.
+  setInterval(() => { if (typeof db !== 'undefined' && db) flushWriteQueue(db); }, 30000);
+}
+/* ---------------------------------------------------------------------- */
+
 // Encodes a JS value the way Firebase RTDB's REST `equalTo`/`startAt` query
 // params expect: quoted strings, bare numbers/booleans, literal null.
 function rtdbRestValue(v){
@@ -647,24 +746,30 @@ class RTDBQuery {
 
 class RTDBDoc {
   constructor(client, path, id){ this.client = client; this.path = path; this.id = id; }
-  set(data){ return this.client._fetch(this.path, 'PUT', data); }
-  update(data){ return this.client._fetch(this.path, 'PATCH', data); }
-  delete(){ return this.client._fetch(this.path, 'DELETE'); }
+  set(data){ return queuedWrite(this.client, 'PUT', this.path, data); }
+  update(data){ return queuedWrite(this.client, 'PATCH', this.path, data); }
+  delete(){ return queuedWrite(this.client, 'DELETE', this.path, undefined); }
 }
 
 class RTDBCollection extends RTDBQuery {
   constructor(client, name){ super(client, name); this.name = name; }
   doc(id){ id = id || rtdbPushId(); return new RTDBDoc(this.client, `${this.name}/${id}`, id); }
   async add(data){
-    const result = await this.client._fetch(this.name, 'POST', data);
-    return { id: result.name };
+    // Generate the ID client-side (same generator doc() already uses)
+    // instead of waiting on the server to hand one back via POST. This is
+    // what makes add() queueable offline just like set/update/delete: the
+    // caller has a real ID to use immediately, and the write itself is a
+    // plain idempotent PUT that queuedWrite() can retry safely.
+    const id = rtdbPushId();
+    await queuedWrite(this.client, 'PUT', `${this.name}/${id}`, data);
+    return { id };
   }
 }
 
 class RTDBBatch {
   constructor(client){ this.client = client; this.updates = {}; }
   set(ref, data){ this.updates[ref.path] = data; return this; }
-  commit(){ return this.client._fetch('', 'PATCH', this.updates); }
+  commit(){ return queuedWrite(this.client, 'PATCH', '', this.updates); }
 }
 /* ------------------------------------------------------------------------- */
 
@@ -1022,10 +1127,28 @@ async function signup(username, password, name, phone, depotChoice, remember=tru
 // audit-trail ambiguity of a brand-new person inheriting an old username.
 async function checkUsernameAvailable(username){
   if (!username) return null;
-  const snap = await db.collection('users').where('username','==',username).limit(1).get();
-  const available = snap.empty;
-  __lastUsernameCheck = { username, available, ts: Date.now() };
-  return available;
+  try {
+    const snap = await db.collection('users').where('username','==',username).limit(1).get();
+    const available = snap.empty;
+    __lastUsernameCheck = { username, available, ts: Date.now(), verified: true };
+    return available;
+  } catch (e) {
+    if (e.retryable === false) throw e; // a real rejection (e.g. permission) - not a connectivity issue, let it surface
+    // Offline / unreachable: this is a GLOBAL uniqueness check (usernames
+    // are unique across every tenant, not just this Manager's), so it
+    // can't be fully verified without a connection - there's no local
+    // mirror of every username in the system. Fall back to whatever
+    // usernames this device does already know about (the signed-in
+    // account itself, plus - for a Manager - their own already-synced SDC
+    // list) so the obvious accidental duplicate is still caught, and mark
+    // the result as unverified so the caller can be upfront that real
+    // uniqueness will only be confirmed once the account's write reaches
+    // the server, same as every other write in this app.
+    const known = new Set([state.user && state.user.username, ...((state.sdcAccounts||[]).map(a=>a.username))].filter(Boolean));
+    const available = !known.has(username);
+    __lastUsernameCheck = { username, available, ts: Date.now(), verified: false };
+    return available;
+  }
 }
 
 // Populated by checkUsernameAvailable (including the live typing indicator).
@@ -1094,13 +1217,19 @@ async function createSdcAccount(username, password, name, phone, depotId){
 
   const available = await checkUsernameAvailableCached(username);
   if (!available) throw new Error('That username is already taken. Please choose another.');
+  // checkUsernameAvailableCached() may have only been able to check
+  // locally (no connection to confirm global uniqueness) - the account is
+  // still created and queued for sync like any other write in this app,
+  // but the caller should tell the person uniqueness isn't confirmed yet
+  // rather than implying it's fully done.
+  const verified = !!(__lastUsernameCheck && __lastUsernameCheck.username === username && __lastUsernameCheck.verified);
 
   const newUserRef = db.collection('users').doc();
   await newUserRef.set({ username, password, name, role: 'SDC', phone: phone || null, depotId, ownerUsername: state.user.username });
   // state.sdcAccounts updates itself via the live listener in
   // startRealtimeSync - no manual reload needed, same as every other
   // collection's create/update/delete path in this file.
-  return newUserRef.id;
+  return { id: newUserRef.id, verified };
 }
 
 // Moves an SDC login between depots, or unlinks it entirely. depotId is
@@ -1726,12 +1855,23 @@ function attachAppEvents(){
 }
 
 function offlineBannerHtml(){
-  if (!state.usingCachedData) return '';
-  return `
-  <div class="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-    ${iconRefresh()}
-    <span>Showing the last data saved on this device - reconnecting to sync the latest changes.</span>
-  </div>`;
+  const pending = pendingWriteCount();
+  let html = '';
+  if (state.usingCachedData) {
+    html += `
+    <div class="mb-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+      ${iconRefresh()}
+      <span>Showing the last data saved on this device - reconnecting to sync the latest changes.</span>
+    </div>`;
+  }
+  if (pending > 0) {
+    html += `
+    <div class="mb-4 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+      ${iconRefresh()}
+      <span>${pending} change${pending === 1 ? '' : 's'} saved on this device, waiting to sync - nothing is lost, this will finish automatically once you're back online.</span>
+    </div>`;
+  }
+  return html;
 }
 
 async function renderPageContent(){
@@ -2845,8 +2985,10 @@ function attachAccountsEvents(){
       if (password.length < 6){ toast('Password must be at least 6 characters','error'); return; }
       const btn = document.getElementById('modal-submit'); btn.disabled=true; btn.textContent='Creating...';
       try{
-        await createSdcAccount(username, password, name, phone, depotId);
-        toast(`${name}'s SDC account created`);
+        const result = await createSdcAccount(username, password, name, phone, depotId);
+        toast(result.verified
+          ? `${name}'s SDC account created`
+          : `${name}'s SDC account saved on this device - username will be confirmed unique once you're back online`);
         closeModal();
         renderPageAfterFetch();
       } catch(err){ toast('Failed: '+err.message,'error'); btn.disabled=false; btn.textContent='Create Account'; }
@@ -3510,6 +3652,10 @@ function attachSettingsEvents(){
 /* ------------------------------- Bootstrap ------------------------------- */
 (async function init(){
   if (!LIBS_OK || window.__depotLibFailed) return;
+  // Anything queued while the app was last closed offline gets a chance to
+  // land right away, before the person even does anything - best-effort,
+  // never blocks first paint on it.
+  flushWriteQueue(db).catch(()=>{});
   const saved = loadAuthSession();
   if (saved){
     try{
