@@ -981,20 +981,44 @@ function friendlyAuthError(err){
 const AUTH_KEY = 'depot-auth';
 function saveAuthSession(user, remember){
   const json = JSON.stringify(user);
-  if (remember){
-    localStorage.setItem(AUTH_KEY, json);
-    sessionStorage.removeItem(AUTH_KEY);
-  } else {
-    sessionStorage.setItem(AUTH_KEY, json);
-    localStorage.removeItem(AUTH_KEY);
+  // Storage writes can throw (quota exceeded, private-browsing
+  // restrictions, or storage disabled entirely in some in-app-browser
+  // contexts) - this previously had no try/catch, unlike every other
+  // storage write in this file. That meant a failed write here didn't just
+  // fail silently, it threw and rejected the whole login()/signup() call
+  // AFTER state.user had already been set in memory: the person looked
+  // logged in for the rest of this session, but nothing was ever actually
+  // saved, so the very next refresh or app restart found no session and
+  // bounced them back to the login screen. Try the requested storage
+  // first; if that fails, fall back to the other one rather than losing
+  // the session entirely, and only give up (log, don't throw) if neither
+  // works - a failed save should never be the reason login() itself fails.
+  try {
+    if (remember){
+      localStorage.setItem(AUTH_KEY, json);
+      try { sessionStorage.removeItem(AUTH_KEY); } catch(e){}
+    } else {
+      sessionStorage.setItem(AUTH_KEY, json);
+      try { localStorage.removeItem(AUTH_KEY); } catch(e){}
+    }
+  } catch (e) {
+    try {
+      // Fall back to whichever storage wasn't just tried, so the session
+      // still survives a refresh even if it can't honor the person's
+      // "stay logged in" choice exactly.
+      (remember ? sessionStorage : localStorage).setItem(AUTH_KEY, json);
+    } catch (e2) {
+      console.error('Could not persist login session to any storage:', e2);
+    }
   }
 }
 function loadAuthSession(){
-  return localStorage.getItem(AUTH_KEY) || sessionStorage.getItem(AUTH_KEY);
+  try { return localStorage.getItem(AUTH_KEY) || sessionStorage.getItem(AUTH_KEY); }
+  catch (e) { return null; }
 }
 function clearAuthSession(){
-  localStorage.removeItem(AUTH_KEY);
-  sessionStorage.removeItem(AUTH_KEY);
+  try { localStorage.removeItem(AUTH_KEY); } catch(e){}
+  try { sessionStorage.removeItem(AUTH_KEY); } catch(e){}
 }
 // Re-saves the signed-in user's current data (e.g. after createDepot adds a
 // depotId) to whichever storage the session already lives in, so a mid-
@@ -1003,8 +1027,14 @@ function clearAuthSession(){
 function persistCurrentUser(){
   if (!state.user) return;
   const json = JSON.stringify(state.user);
-  if (localStorage.getItem(AUTH_KEY) !== null) localStorage.setItem(AUTH_KEY, json);
-  else sessionStorage.setItem(AUTH_KEY, json);
+  try {
+    let inLocal = false;
+    try { inLocal = localStorage.getItem(AUTH_KEY) !== null; } catch(e){}
+    if (inLocal) localStorage.setItem(AUTH_KEY, json);
+    else sessionStorage.setItem(AUTH_KEY, json);
+  } catch (e) {
+    console.error('Could not persist updated session:', e);
+  }
 }
 
 async function ensureAnonAuth(){
@@ -3667,7 +3697,13 @@ function attachSettingsEvents(){
       // someone out just because they opened the app without signal.
       try { await ensureAnonAuth(); } catch(e){ reportSyncError('sign-in (offline)', e); }
       try { await loadDepotsForUser(); } catch(e){ reportSyncError('depots (offline)', e); }
-    } catch(e){ state.user = null; }
+    } catch(e){
+      // Genuinely corrupted saved session (not a network issue - JSON.parse
+      // itself failed). Clear it so it doesn't keep silently failing to
+      // restore on every future refresh too.
+      state.user = null;
+      clearAuthSession();
+    }
   } else {
     // No saved session - this is a brand-new visitor. Warm up an anonymous
     // auth session in the background (don't block first paint on it) so
