@@ -145,6 +145,38 @@
   }
   #splash .enter-btn:hover, #splash .enter-btn:active{ background:#FDE047; color:#78350F; transform:scale(.97); }
   #splash .footnote{ margin-top:14px; font-size:10px; color:rgba(255,255,255,.5); }
+
+  /* ── "m3-" prefixed styles: Satellite Depot Manager v3 look, scoped to
+     the new Backup & Data / Depot Details section added to Settings only.
+     Kept deliberately separate from the Tailwind-driven rest of the app. ── */
+  .m3-card{
+    background:#FFFDF7; border:1px solid #FDE68A; border-radius:10px;
+    padding:16px 16px 14px; box-shadow:0 1px 2px rgba(120,98,43,.08), 0 2px 8px rgba(120,98,43,.06);
+  }
+  .m3-card + .m3-card{ margin-top:14px; }
+  .m3-card h3{ font-size:16px; margin:0 0 4px 0; color:#92400E; font-family: Georgia, "Times New Roman", serif; }
+  .m3-card p.m3-sub{ font-size:12.5px; color:#78622B; margin:0 0 14px 0; }
+  .m3-row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .m3-label{ display:block; font-size:12px; font-weight:700; color:#78622B; margin-bottom:4px; margin-top:10px; }
+  .m3-label:first-child{ margin-top:0; }
+  .m3-input{
+    width:100%; padding:9px 10px; border:1px solid #FDE68A; border-radius:7px;
+    font-size:14px; background:#fff; color:#2E2A24; box-sizing:border-box;
+  }
+  .m3-input:focus{ outline:none; border-color:#EAB308; box-shadow:0 0 0 3px rgba(234,179,8,.2); }
+  .m3-btn{
+    display:inline-flex; align-items:center; gap:6px; border:none; border-radius:7px;
+    padding:9px 14px; font-size:13px; font-weight:700; cursor:pointer; margin-top:10px;
+  }
+  .m3-btn-primary{ background:#B45309; color:#fff; }
+  .m3-btn-primary:active{ background:#92400E; }
+  .m3-btn-gold{ background:#EAB308; color:#78350F; }
+  .m3-btn-gold:active{ background:#CA8A04; }
+  .m3-btn-outline{ background:none; border:1px solid #78622B; color:#78622B; }
+  .m3-btn-danger{ background:none; color:#DC2626; border:1px solid #DC2626; }
+  .m3-btn-danger:hover{ background:#DC2626; color:#fff; }
+  .m3-divider{ border:none; border-top:1px dashed #FDE68A; margin:14px 0; }
+  .m3-hint{ font-size:11.5px; color:#8a8072; margin-top:6px; }
 </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
@@ -3620,7 +3652,204 @@ function renderSettings(){
         </table>
       </div>
     </div>
+    ${renderDepotDetailsCard()}
+    ${renderBackupDataCard()}
   </div>`;
+}
+
+/* ===================== Depot Details (from Satellite Depot Manager v3) =====================
+   District/Province/MA contact fields kept on the depot document itself so they travel with
+   the depot the same way name/location already do - nothing new to sync here. */
+function currentDepotRecord(){
+  return state.depots.find(d=>d.id===state.currentDepotId) || null;
+}
+
+function renderDepotDetailsCard(){
+  const d = currentDepotRecord();
+  if (!d) return '';
+  return `
+  <div class="m3-card">
+    <h3>Depot Details</h3>
+    <p class="m3-sub">Extra depot info used on printed reports and the WhatsApp summary (district, province, Marketing Agent contact).</p>
+    <form id="m3-depot-details-form">
+      <div class="m3-row2">
+        <div><label class="m3-label">District</label><input class="m3-input" id="m3-dd-district" value="${esc(d.district)||''}" placeholder="e.g. Mansa"></div>
+        <div><label class="m3-label">Province</label><input class="m3-input" id="m3-dd-province" value="${esc(d.province)||''}" placeholder="e.g. Luapula"></div>
+      </div>
+      <div class="m3-row2">
+        <div><label class="m3-label">Marketing Agent Name</label><input class="m3-input" id="m3-dd-maname" value="${esc(d.maName)||''}" placeholder="e.g. J. Mwansa"></div>
+        <div><label class="m3-label">Marketing Agent Phone</label><input class="m3-input" id="m3-dd-maphone" value="${esc(d.maPhone)||''}" placeholder="+260..."></div>
+      </div>
+      <button type="submit" class="m3-btn m3-btn-primary" id="m3-dd-save">Save Depot Details</button>
+    </form>
+  </div>`;
+}
+
+/* ===================== Backup, Restore & Reset (from Satellite Depot Manager v3) =====================
+   Uses index.html's own Firebase collections/data model - this is not a separate offline store,
+   just an export/import/wipe of the same records already synced for state.currentDepotId. */
+function renderBackupDataCard(){
+  const d = currentDepotRecord();
+  const hasPin = !!(d && d.deletePin);
+  return `
+  <div class="m3-card">
+    <h3>Backup &amp; Data</h3>
+    <p class="m3-sub">Download a backup of this depot's data, restore from a backup file, or wipe this depot's records. These apply to <b>${esc(currentDepotName())}</b> only.</p>
+
+    <label class="m3-label">Delete PIN</label>
+    <div class="m3-row2">
+      <input class="m3-input" type="text" inputmode="numeric" maxlength="8" id="m3-pin-input" placeholder="${hasPin?'PIN is set':'Set a PIN (default 1234)'}">
+      <button type="button" class="m3-btn m3-btn-outline" id="m3-pin-save" style="margin-top:0;align-self:start;">Save PIN</button>
+    </div>
+    <p class="m3-hint">Required before Import or Reset can run, to prevent accidental data loss. Defaults to <b>1234</b> if never set.</p>
+
+    <hr class="m3-divider">
+
+    <button type="button" class="m3-btn m3-btn-gold" id="m3-export-btn">⬇ Export Backup (.json)</button>
+    <button type="button" class="m3-btn m3-btn-outline" id="m3-import-btn">⬆ Import Backup</button>
+    <input type="file" accept="application/json" id="m3-import-file" style="display:none;">
+    <p class="m3-hint">Export saves stock items, transactions, maize purchases/dispatches/damaged bags, personnel, labor payments, pay rates, payroll workers &amp; entries, plus depot details, to one file. Import restores from that file into this depot (existing records with the same ID are overwritten).</p>
+
+    <hr class="m3-divider">
+
+    <button type="button" class="m3-btn m3-btn-danger" id="m3-reset-btn">Erase All Data For This Depot</button>
+    <p class="m3-hint">Permanently deletes every stock, maize, personnel and payroll record for this depot. Cannot be undone. Requires the Delete PIN.</p>
+  </div>`;
+}
+
+function attachDepotDetailsEvents(){
+  const form = document.getElementById('m3-depot-details-form');
+  if (!form) return;
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const d = currentDepotRecord();
+    if (!d) return;
+    const btn = document.getElementById('m3-dd-save'); btn.disabled = true; btn.textContent = 'Saving...';
+    try{
+      await db.collection('depots').doc(d.id).update({
+        district: document.getElementById('m3-dd-district').value.trim() || null,
+        province: document.getElementById('m3-dd-province').value.trim() || null,
+        maName: document.getElementById('m3-dd-maname').value.trim() || null,
+        maPhone: document.getElementById('m3-dd-maphone').value.trim() || null,
+      });
+      Object.assign(d, {
+        district: document.getElementById('m3-dd-district').value.trim() || null,
+        province: document.getElementById('m3-dd-province').value.trim() || null,
+        maName: document.getElementById('m3-dd-maname').value.trim() || null,
+        maPhone: document.getElementById('m3-dd-maphone').value.trim() || null,
+      });
+      toast('Depot details saved');
+    } catch(err){ toast('Failed: '+err.message,'error'); }
+    btn.disabled = false; btn.textContent = 'Save Depot Details';
+  });
+}
+
+function m3CheckPin(promptLabel){
+  const d = currentDepotRecord();
+  const expected = (d && d.deletePin) ? d.deletePin : '1234';
+  const entered = prompt(promptLabel || 'Enter Delete PIN to continue:');
+  if (entered === null) return false;
+  if (entered.trim() !== String(expected)) { toast('Incorrect PIN', 'error'); return false; }
+  return true;
+}
+
+function attachBackupDataEvents(){
+  const pinSaveBtn = document.getElementById('m3-pin-save');
+  if (pinSaveBtn) pinSaveBtn.addEventListener('click', async ()=>{
+    const d = currentDepotRecord();
+    if (!d) return;
+    const val = document.getElementById('m3-pin-input').value.trim();
+    if (!val){ toast('Enter a PIN first','error'); return; }
+    try{
+      await db.collection('depots').doc(d.id).update({ deletePin: val });
+      d.deletePin = val;
+      toast('Delete PIN saved');
+      renderPageAfterFetch();
+    } catch(err){ toast('Failed: '+err.message,'error'); }
+  });
+
+  const exportBtn = document.getElementById('m3-export-btn');
+  if (exportBtn) exportBtn.addEventListener('click', ()=>{
+    const d = currentDepotRecord();
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      depot: d ? { id: d.id, name: d.name, location: d.location||null, district: d.district||null, province: d.province||null, maName: d.maName||null, maPhone: d.maPhone||null } : null,
+      stockItems: state.stockItems,
+      stockTransactions: state.stockTransactions,
+      maizePurchases: state.maizePurchases,
+      maizeDispatches: state.maizeDispatches,
+      maizeDamagedBags: state.maizeDamagedBags,
+      personnel: state.personnel,
+      laborPayments: state.laborPayments,
+      payRates: state.payRates,
+      payrollWorkers: state.payrollWorkers,
+      payrollEntries: state.payrollEntries,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `depot-backup-${(d&&d.name||'depot').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}-${todayStr()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Backup downloaded');
+  });
+
+  const importBtn = document.getElementById('m3-import-btn');
+  const importFile = document.getElementById('m3-import-file');
+  if (importBtn) importBtn.addEventListener('click', ()=>{
+    if (!m3CheckPin('Enter Delete PIN to import (existing records will be overwritten):')) return;
+    importFile.click();
+  });
+  if (importFile) importFile.addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async ()=>{
+      let parsed;
+      try{ parsed = JSON.parse(reader.result); } catch(err){ toast('Invalid backup file','error'); return; }
+      if (!confirm('Import this backup into ' + currentDepotName() + '? Records with matching IDs will be overwritten.')) return;
+      const collections = ['stockItems','stockTransactions','maizePurchases','maizeDispatches','maizeDamagedBags','personnel','laborPayments','payRates','payrollWorkers','payrollEntries'];
+      try{
+        let count = 0;
+        for (const name of collections){
+          const rows = Array.isArray(parsed[name]) ? parsed[name] : [];
+          for (const row of rows){
+            const { id, ...data } = row;
+            data.depotId = state.currentDepotId;
+            await db.collection(name).doc(id).set(data);
+            count++;
+          }
+        }
+        toast(`Backup imported (${count} records)`);
+        await refreshCurrentPage();
+      } catch(err){ toast('Import failed: '+err.message,'error'); }
+    };
+    reader.readAsText(file);
+    importFile.value = '';
+  });
+
+  const resetBtn = document.getElementById('m3-reset-btn');
+  if (resetBtn) resetBtn.addEventListener('click', async ()=>{
+    if (!m3CheckPin('Enter Delete PIN to erase this depot\'s data:')) return;
+    if (!confirm('This will permanently delete ALL stock, maize, personnel and payroll records for ' + currentDepotName() + '. This cannot be undone. Continue?')) return;
+    if (!confirm('Are you absolutely sure? Type OK to erase everything for this depot.')) return;
+    resetBtn.disabled = true; resetBtn.textContent = 'Erasing...';
+    try{
+      const collections = [
+        ['stockItems', state.stockItems], ['stockTransactions', state.stockTransactions],
+        ['maizePurchases', state.maizePurchases], ['maizeDispatches', state.maizeDispatches],
+        ['maizeDamagedBags', state.maizeDamagedBags], ['personnel', state.personnel],
+        ['laborPayments', state.laborPayments], ['payRates', state.payRates],
+        ['payrollWorkers', state.payrollWorkers], ['payrollEntries', state.payrollEntries],
+      ];
+      for (const [name, rows] of collections){
+        for (const row of rows) await db.collection(name).doc(row.id).delete();
+      }
+      toast('All data erased for this depot');
+      await refreshCurrentPage();
+    } catch(err){ toast('Failed: '+err.message,'error'); }
+    resetBtn.disabled = false; resetBtn.textContent = 'Erase All Data For This Depot';
+  });
 }
 
 function catalogItemModal(existing){
@@ -3643,6 +3872,8 @@ function catalogItemModal(existing){
 }
 
 function attachSettingsEvents(){
+  attachDepotDetailsEvents();
+  attachBackupDataEvents();
   const newBtn = document.getElementById('new-catalog-item-btn');
   if (newBtn) newBtn.addEventListener('click', ()=>{
     document.getElementById('modal-root').innerHTML = catalogItemModal(null);
