@@ -857,6 +857,17 @@ function fmtDate(d){ return new Date(d).toLocaleDateString(); }
 function todayStr(){ return new Date().toISOString().split('T')[0]; }
 function esc(s){ return (s===null||s===undefined)?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+// True when running inside the installed Median-wrapped app (native Android/iOS
+// build), false when opened in a regular mobile/desktop browser. The Median
+// config for this app injects a `window.median` bridge object and appends
+// "median" to the user agent on every platform, so either signal is enough -
+// checking both makes the detection robust if one gets stripped by a webview.
+function isInstalledApp(){
+  try{
+    return !!(window.median || window.gonative) || /median/i.test(navigator.userAgent || '');
+  } catch(e){ return false; }
+}
+
 function toast(msg, type='success'){
   const wrap = document.getElementById('toast-wrap');
   // Dedupe: if this exact message is already showing, just restart its timer
@@ -941,6 +952,7 @@ function iconUsers(){ return svgIcon('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0
 function iconCash(){ return svgIcon('<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>'); }
 function iconChart(){ return svgIcon('<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>'); }
 function iconPlus(){ return svgIcon('<path d="M12 5v14M5 12h14"/>'); }
+function iconDownload(){ return svgIcon('<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/>'); }
 function iconRefresh(){ return svgIcon('<path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>'); }
 function iconWheat(){ return svgIcon('<path d="M12 22V2"/><path d="M17 8c0 2-2 3-5 3s-5-1-5-3 2-4 5-4 5 2 5 4z"/><path d="M17 14c0 2-2 3-5 3s-5-1-5-3 2-4 5-4 5 2 5 4z"/>', 'style="width:2rem;height:2rem;"'); }
 function iconWheat2(){ return svgIcon('<path d="M12 22V2"/><path d="M17 8c0 2-2 3-5 3s-5-1-5-3 2-4 5-4 5 2 5 4z"/><path d="M17 14c0 2-2 3-5 3s-5-1-5-3 2-4 5-4 5 2 5 4z"/>'); }
@@ -1697,6 +1709,10 @@ function renderLogin(){
           ? `Already have an account? <button id="show-login" class="text-emerald-700 font-medium hover:underline">Sign In</button>`
           : `Need an account? <button id="show-signup" class="text-emerald-700 font-medium hover:underline">Create one</button>`}
       </p>
+      ${!isInstalledApp() ? `
+      <a href="app.apk" download class="btn btn-outline w-full mt-4" style="gap:0.5rem;">
+        ${iconDownload()} Download Android App
+      </a>` : ''}
     </div>
   </div>`;
 }
@@ -1851,6 +1867,7 @@ function renderApp(){
           <p class="text-xs text-gray-500">${esc(state.user.role)}</p>
         </div>
       </div>
+      ${!isInstalledApp() ? `<a href="app.apk" download class="nav-item w-full text-emerald-700 hover:text-emerald-800">${iconDownload()}Download App</a>` : ''}
       <button id="logout-btn" class="nav-item w-full text-red-500 hover:text-red-600">${iconLogout()}Sign Out</button>
     </div>
   </aside>
