@@ -1,9 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Satellite Depot Manager</title>
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoiU2F0ZWxsaXRlIERlcG90IE1hbmFnZXIiLCJzaG9ydF9uYW1lIjoiRGVwb3QgTWFuYWdlciIsImRlc2NyaXB0aW9uIjoiT2ZmbGluZS1maXJzdCBncmFpbiBpbnRha2UsIGVxdWlwbWVudCBhbmQgcGF5cm9sbCBtYW5hZ2VyIGZvciBGUkEgc2F0ZWxsaXRlIGRlcG90cy4iLCJzdGFydF91cmwiOiIuLyIsInNjb3BlIjoiLi8iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsIm9yaWVudGF0aW9uIjoicG9ydHJhaXQtcHJpbWFyeSIsImJhY2tncm91bmRfY29sb3IiOiIjRkZGQkVCIiwidGhlbWVfY29sb3IiOiIjOTI0MDBFIiwiaWNvbnMiOlt7InNyYyI6ImRhdGE6aW1hZ2UvcG5nO2Jhc2U2NCxpVkJPUncwS0dnb0FBQUFOU1VoRVVnQUFBTUFBQUFEQUNBSUFBQURkdnZ0UUFBQUVqRWxFUVZSNG5PM2R4NDRkUlJnRjRDazBDeVFRajRCNEQ3TmdCNDRZSjdFZ0I1TXpKamhuZ2drUzc0Q3daenoyZUlKdDl2QWNJRjdFTEdCeGZURVl6K201MWQzMWZUdHY3clJVUjZmKzdtcTF5dytQUFRRSEd6VS9OM2VyOWpVd1lQTnpwZllsTUdUejhrTkNBeEhSUUVRMEVKSDVJa0FFN3F0OUFReWJCaUtpZ1lob0lDTHV3b2pZd29qWXdvaG9JQ0lhaUlnaG1vakRWQ0lhaUlnR0lxS0JpTGdMSStJNUVCRU5SRVFERVRGRUU3R0ZFYkdGRWRGQVJEUVFFUTFFeEYwWWtmbmkrMEFFTkJBUnIzTVEwVUJFQklpSUxZeUlCaUtpZ1lob0lDS09Nb2c0VENXaWdZaG9JQ0lhNkM0T25OdXljT1RYMmxmUlgrV25aeDZzZlEwOWRlRHNsc2wvTGh3Vm96c29Gd1hvZHZ0dno4MC9MVXJTaEhMeFdRSDYyLzR6ZDRuT3BNVmpZalEzSjBCL3VhZm9UQktqY3VtNWRnTzA3L1FHY3pQbDh2RjJZMVF1UGQ5aWdQYWQ2aVk2VXk2ZmFDNUpaYUd4QU8zZG5PaE1XbW9wUm1YaGhTWUN0UGZrcHVkbXl0TEpKbUpVRnNjZW9EMHpqODZVSzZOT1VsbDhjYlFCMm5PaWNuUW1YVGsxemhpVnl5K05MVUJQSGU5UmJxWmNQVDIyR0kwcVFIMk96cFRSSktrc3ZUeUdBTzArTnBqb1RGbytNL2dZRFR0QUE4M05sRUhIcUN5OU1zZ0E3VDQ2aHVoTVdqNDd5QmlWSzY4T0xFQlBIaGxiZEtaY096ZWtKQTBwUUtPUHpxU2h4S2hjUGRqM0FPMDYzRkJ1cHF5YzczdU15dFdERDlTK2huKzE2L0NqdFMraEwxYk8vMUw3RXU2c0xML1d4d0R0L0Z4MDdtRDFpOTdGcUN5LzNxTUE3ZnhNYnU1dTljc2V4YWhjNjBlQWRvak9QVnJyUjR6S3RUY3FCMmpIcDZJVFdmdXFacExLU3FVQWJaZWJUcTFYaWxGWmVYUFdBZHIraWVoc2x2V3ZaeDJqc3ZyVzdBSzA3WkRvek1qMUN6TkswaXdDSkRlMXpDQkdaZlh0VFF6UXRvOUZwNzdyMzJ4aWpNcmE1Z1JvcStqMHo0MU5TRkpaZTZmTEFHMzlTRzc2N3NhM1hjYW9yTC9iVFlDZStGQjBodVRtZDkzRXFJTUFpYzV3NVRFcTE5L2JZSUFlLzBCdXh1UG43emVZcEkwRVNIVEdhZ014S2pmZTcyQUdldUxDNy9tUE1HTTNEejJTLzRnUGpUZXNpNlgzWHgyMHE1T2wxMEFONjJMcGZTZWFpTzlFdDZ1VHBiZUZOY3dRVGNJUVRVWURrZEJBWkxwcElBRnFWU2RMN3prUUVRM1VMZzFFZlJxb1hWMDlpYjdWd2M4d1JGMHN2UzJNaUMyc1hZWm82dE5BN2ZJNkJ4bUhxU1FjcHBMUlFDUTBFQm12YzVEd0hJajZiR0VOTTBTVE1FU1RNVVNUTUVSVG53WnFsd2FpUGczVUxxOXprUEVjaUlUblFHUTAwUCt4L3ZUREZmLzY5b3QvVlB6ci8wMERrVEZFRTdHRmtiQ0ZrZEZBSkRRUUdhOXprSENZU24zenhmZUJXdFhKMG1zZ0ltYWdkbm1kZzR3aG11cHNZZTF5RzA5OUdxaGRobWd5RGxOSk9Fd2xvNEZJYUNBeVh1Y2c0VGtROVdtZ2Rta2c2ak5FTjh3UVRjSVdSbjBhcUYwYWlQbzBVTHU4emtIR1lTb0poNmxrTkJBSkRVVEdFRTNFRmtiQ0ZrWkdBNUhvcW9GOEg2aFZYU3k5bzR4Mk9VeWxQZzNVTGcxRWZScW9YVjduSU9NNUVJbE9scjc4OXVQOVhmd09qVEpFRXpGRUV6RkVFekZFRTlGQVJEUVFFUTFFeEYwWUVjK0JpR2dnSWhxSWlDR2FpQzJNaUMyTWlBWWlvb0dJYUNBaTdzS0lPRXdsb29HSWFDQWlHb2pJbnduZXBCa1BscEZzQUFBQUFFbEZUa1N1UW1DQyIsInNpemVzIjoiMTkyeDE5MiIsInR5cGUiOiJpbWFnZS9wbmciLCJwdXJwb3NlIjoiYW55In0seyJzcmMiOiJkYXRhOmltYWdlL3BuZztiYXNlNjQsaVZCT1J3MEtHZ29BQUFBTlNVaEVVZ0FBQWdBQUFBSUFDQUlBQUFCN0drT3RBQUFNbzBsRVFWUjRuTzNkMTQ2ZFZ4M0c0YjJpZllBRTRoSVE5d0VIbk1WcFRqZElvWmZRSVpSUTBqc2xOSEVQS0k3YnVOczVoK3NBY1NQbXhFaVRrY3ZNckwzM1d2L3ZmWjRyK0k3ZW45ZTN2ajF1Zi8vQ3AxY0E1Rm12VnJkR1B3TUFBend3K2dFQUdFTUFBRUlKQUVDbzlhcU5mZ1FBUmxqYmY0Qk1YZ0VCaEJJQWdGRHVBQUJDT1FFQWhCSUFnRkMrQWdJSTVRUUFFTW9sTUVBb0p3Q0FVQUlBRUVvQUFFS3RtenNBZ0VoT0FBQ2hCQUFnbEFBQWhCSUFnRkIrQ0FZUXl0OENBZ2psRlJCQUtBRUFDT1VPQUNDVUV3QkFLQUVBQ09VcklJQlFUZ0FBb1Z3Q0E0UnlBZ0FJSlFBQW9Wd0NBNFJ5QndBUXlpc2dnRkFDQUJCS0FBQkNDUUJBcUhWekNRd1F5UWtBSUpRQUFJUVNBSUJRZmdnR0VNb0pBQ0NVdndVRUVNb0pBQ0NVT3dDQVVFNEFBS0VFQUNDVUFBQ0U4aFVRUUNpWHdBQ2h2QUlDQ0NVQUFLRUVBQ0NVT3dDQVVMNENBZ2psRlJCQUtBRUFDQ1VBQUtGY0FnT0VjZ2tNRU1vcklJQlFBZ0FReWgwQVFDZ25BSUJRQWdBUXlsZEFBS0djQUFCQ3VRUUdDT1VFQUJCS0FBQkNDUUJBcUhWekJ3QVF5UWtBSUpRQUFJUVNBSUJRQWdBUXlnL0JBRUw1VzBBQW9id0NBZ2dsQUFDaDNBRUFoRnF2VnJkR1B3TUFBM2dGQkJES1YwQUFvWndBQUVLNUJBWUk1UVFBRUVvQUFFSUpBRUFvL3lNWVFDZ25BSUJRQWdBUVNnQUFRdmtkQUVBb2Z3b0NJSlJYUUFDaEJBQWdsQUFBaEhJSkRCREtDUUFnbEsrQUFFSTVBUUNFY2djQUVNb0pBQ0NVQUFDRUVnQ0FVTDRDQWdqbEVoZ2dsRmRBQUtFRUFDQ1VBQUNFY2djQUVNcFhRQUNodkFJQ0NDVUFBS0VFQUNDVVMyQ0FVRTRBUlB2aXU1OGIvUWd3VFB2Z3VVK05mZ1lZNE5USHAvL015LzhhOVNRd2lnQ1E1ZFE5LzhrdkEwUnBIM3haQUlodzZwMGp2TzA1ODRvU3NId0N3UElkYWZyM2t3R1dUUUJZc21OUC8zNHl3RksxMHdMQTRqeTdpZDAvNEt3TXNEZ0N3S0pzWS9vUFVBSVdvNTMraWdDd0JNKyt2ZE12K3MrK0tnT1VKd0NVdCtQcDMwOEdLRTBBcUdyZzdoOGdBeFFsQU5RenovUWZvQVRVMGo3OHFnQlF4ak52VFRyOSs1MTdUUWFvUVFDb29jVDA3eWNEekU4QW1GcTUzVDlBQnBpWkFEQ3A2dE4vZ0JJd0lRRmdPZ3ViL3Yxa2dLbTBENzhtQU16aW1UY1hPLzM3blh0ZEJwaENPeU1BalBaMHh1NGZjRjRHR0UwQUdDbHorZzlRQWtZUkFNWXcvUWZJQUx2WHpueGRBTmlwcDk4dy9YZDEvZzBaWUhjRWdCMngrNGNuQSt5R0FMQjFwdi9ZbElDdGFtY0ZnSzE1eXZSdndnVVpZRHZhMlc4SUFKdjMxT3VtZjhNdXZDa0RiSmdBc0VsMmY5dGtnQTBTQURiRDlPK1lFdEJQQU9obCtnZVNBWG9JQU1kbitpY2hBeHhQTy9kTkFlQm9ubnpON3M5bzd5MFo0R2dFZ0NNdy9TVW9BWWNrQUJ5SzZTOUhCcmd2QWVCZTdINTFNc0E5dEhQZkVnRHU0TWxYVGY5eTdMMHRBOXlCQUhDUTZWOHdKV0MvZGw0QStMOG5USCtHaXpMQWFyVVNBRloyUDVVTUlBRFJURDh5a0t5ZC83WUFKSHJpRmRQUHgxeDhSd25pQ0VBYzA4ODl5RUNVZGtFQU1qeHU5em0wU3pLUVFRQ1d6L1J6UERLd2VPM0Nkd1Jnc1I1LzJmU3pBWmZlVllKbEVvQmxNdjFzbkF3c2p3QXNpdDFuMjJSZ1NRUmdJVXcvdXlRRHk5RDJCS0M0azZhZmNTNHJRV1Z0NzNrQnFPcmtTNmFmS1Z4K1R3WkthbnZQZjNMME0zQTBKMS82L09oSGdEdTQvTjQvUno4Q1J5TUFsWmgrNWljRGhRaEFEYWFmY3BSZ2ZtM3Z1d0l3dFpPL05mMFVkdmwzTWpDdmRsRUFwdlNZM1dkQnJzakFsQVJnT3FhZnBaS0IyUWpBUkV3L0laUmdFZ0l3QmROUElCa1lybDM4bmdBTTg5aHY3RDdwcnZ4ZUJvWVJnREZNUCt3bkEwTzBTd0t3VzQrYWZyaTdxMHF3UXdLd082WWZEa2tHZHFOZCtyNEFiTmVqdjdiN2NCeFgveUFEMnlVQVcyVDZvWjhNYkk4QWJJWHBoNDFUZ28wVGdFMnkrN0J0TXJCQjdmSVBCR0FESHZtVjZZZmR1ZlpIR2RnQUFlaGwrbUVVR2Vna0FNZG4rbUVTU25BOEFuQmtkaC9tSkFOSEpRQkhZUHBoZmpKd2VPM0tEd1hnL2g1KzBmUkRKZGZmbDRIN0U0RDdNUDFRbWhMY2d3RGNtZDJISlpHQk94S0FnMHcvTEpVTUhOQ3UvRWdBYm52NGw2WWZsdS82bjJUZ05nRllyVXcvUkZLQ2RqVTRBQS9aZlloM0l6Z0RvUUV3L2NCK21SbUlDNERwQis0bUxRUHQ2bzlUQXZEUUwwdy9jQ2czL2h4Umd1VUh3TzREeDdQNERDdzVBS1lmNkxmZ0RMUnJTd3pBQ2RNUGJOVE5KV2FnWGZ2Sm9nSnc0dWVtSDlpaW0zOVpUZ2tXRWdDN0QrelNNakpRUGdDbUh4aWxlZ1lLQjhEMEF6T29tNEdTQVREOXdJVEtsYUJkLzJtWkFEejRNN3NQek82anY1YkpRSTBBbUg2Z2xoSVptRDBBcGgrb2EvSU16QnNBMHc4c3hwd2xhTmRmbUNzQUQ3NWc5NEZsK3VodmMyVmdvZ0NZZmlEQlBCbG9ONllKd0pHY2VQOC9veDhCNExhYkwzNTI5Q01jeHdPakh3Q0FNUVFBSU5SNjFVWS9Ba0IxTllmVUNRQWdsQUFBaEZyWFBMZ0FUS1Rva0xvREFPaFdjMGk5QWdJSUpRQUFvUVFBSUpSTFlJQmVSWWZVSlRCQXQ1cEQ2aFVRUUNnQkFBZ2xBQUNoM0FFQWRLczVwTDRDQXVoVmRFaTlBZ0lJSlFBQW9kd0JBSFNyT2FST0FBQ2hCQUFnbEsrQUFIb1ZIVkluQUlCUUxvRUJ1dFVjVWljQWdGQUNBQkJLQUFCQ3JWdk5WMWNBOHlnNnBFNEFBS0VFQUNDVUFBQ0VFZ0NBVUg0SUJ0Q3Q1cEQ2VzBBQXZZb09xVmRBQUtFRUFDQ1VPd0NBYmpXSDFBa0FJSlJMWUlCZVJZZDB2VnJkR3YwTUFOV1ZIRkt2Z0FCQ3VRUUc2Rlp6U0owQUFFSUpBRUFvWHdFQjlDbzZwTzRBQUxyVkhGS3ZnQUJDQ1FCQUtBRUFDQ1VBQUtIV3JlYmRCY0E4aWc2cEV3QkFLQUVBQ0NVQUFLSDhFQXlnVzgwaGRRSUFDT1Z2QVFIMEtqcWtUZ0FBb1FRQUlKUkxZSUJ1TllmVUNRQWdsQUFBaFBJVkVFQ3Zva1BxRGdDZ1c4MGg5UW9JSUpRQUFJUVNBSUJRN2dBQXV0VWNVbDhCQWZRcU9xUmVBUUdFRWdDQVVBSUFFTW9sTUVDM21rUHFFaGlnVjlFaDlRb0lJSlFBQUlSeUJ3RFFyZWFRT2dFQWhCSUFnRkMrQWdMb1ZYUkluUUFBUXJrRUJ1aFdjMGlkQUFCQ0NRQkFLQUVBQ0xWdU5WOWRBY3lqNkpBNkFRQ0VFZ0NBVUFJQUVFb0FBRUw1SVJoQXQ1cEQ2bThCQWZRcU9xUmVBUUdFRWdDQVVPNEFBTHJWSEZJbkFJQlFBZ0FReWxkQUFMMktEcWtUQUVBb2w4QUEzV29PcVJNQVFDZ0JBQWpsRWhpZ1Y5RWhkUWZBdGx6NzBtZEdQOEpDUEhMNnY2TWZnZnVwT2FSZUFRR0VFZ0NBVUFJQUVFb0FBRUt0VzgyN0M0QjVGQjFTSndDQVVBSUFFRW9BQUVMNUlSaEF0NXBENmdRQUVNcmZBZ0xvVlhSSW5RQUFRcmtEQU9oV2MwaWRBQUJDQ1FCQUtBRUFDT1VySUlCZVJZZlVKVEJBdDVwRDZoVVFRQ2dCQUFpMVhxMXVqWDRHZ09wS0RxazdBSUJ1TllmVVYwQUF2WW9PcVRzQWdGQUNBQkJLQUFCQ3VRUUc2Rlp6U0owQUFFTDVDZ2lnVjlFaGRRSUFDT1VPQUtCYnpTRjFBZ0FJSlFBQW9Wd0NBL1FxT3FST0FBQ2hYQUlEZEtzNXBFNEFBS0VFQUNDVUFBQ0VXcmVhcjY0QTVsRjBTSjBBQUVJSkFFQW9BUUFJSlFBQW9md1FES0JielNIMXQ0QUFlaFVkVXErQUFFSUpBRUFvZHdBQTNXb09xUk1BUUNnQkFBamxLeUNBWGtXSDFCMEFRTGVhUStvVkVFQW9BUUFJSlFBQW9RUUFJSlQvRVF5Z1Y5RWhkUUlBQ0NVQUFLRUVBQ0NVSDRJQmRLczVwUDRVQkVDdm9rUHFGUkJBS0FFQUNDVUFBS0ZjQWdOMHF6bWtUZ0FBb1h3RkJOQ3I2SkE2QVFDRWNnY0EwSzNta0RvQkFJUVNBSUJRQWdBUXlsZEFBTDJLRHFsTFlJQnVOWWZVS3lDQVVBSUFFRW9BQUVLNUF3RG9Wbk5JZlFVRTBLdm9rSG9GQkJCS0FBQkNDUUJBS0pmQUFOMXFEcWtUQUVBb1h3RUI5Q282cEU0QUFLSGNBUUIwcXpta1RnQUFvUVFBSUpRQUFJVHlGUkJBcjZKRDZoSVlvRnZOSWZVS0NDQ1VBQUNFRWdDQVVPdFc4OVVWd0R5S0Rxa1RBRUFvQVFBSUpRQUFvZndPQUtCYnpTRjFBZ0FJNVU5QkFQUXFPcVJPQUFDaDFxdlZyZEhQQUZCZHlTRjFDUXpRcmVhUWVnVUVFRW9BQUVMNUNnaWdWOUVoZFFjQTBLM21rSG9GQkJCS0FBQkNDUUJBS0FFQUNPVi9CQVBvVlhSSW5RQUFRZ2tBUUNnQkFBamxoMkFBM1dvT3FSTUFRQ2gvQ3dpZ1Y5RWhkUUlBQ0NVQUFLRmNBZ04wcXpta1RnQUFvVndDQS9RcU9xUk9BQUNoM0FFQWRLczVwTzNmLy9qRTZHY0FZQUN2Z0FCQ0NRQkFLRjhCQVlSeUNRd1F5aXNnZ0ZBQ0FCQktBQUJDdVFNQUNPVXJJSUJRWGdFQmhCSUFnRkFDQUJES0pUQkFLQ2NBZ0ZDK0FnSUk1UVFBRU1vZEFFQW9Kd0NBVUFJQUVFb0FBRUt0bXpzQWdFaE9BQUNoQkFBZ2xBQUFoQklBZ0ZCK0NBWVF5dDhDQWdqbEZSQkFLQUVBQ09VT0FDQ1VFd0JBS0pmQUFLR2NBQUJDQ1FCQUtKZkFBS0djQUFCQ0NRQkFLRjhCQVlSeUJ3QVF5aXNnZ0ZBQ0FCQktBQUJDQ1FCQXFIVnpDUXdReVFrQUlKUUFBSVFTQUlCUWZnZ0dFTW9KQUNDVXZ3VUVFTW9KQUNDVUFBQ0VjZ2tNRU1vSkFDQ1VBQUNFOGhVUVFDaDNBQUNodkFJQ0NDVUFBS0VFQUNEVS93QVBpcGdHZ2lqR01BQUFBQUJKUlU1RXJrSmdnZz09Iiwic2l6ZXMiOiI1MTJ4NTEyIiwidHlwZSI6ImltYWdlL3BuZyIsInB1cnBvc2UiOiJhbnkifSx7InNyYyI6ImRhdGE6aW1hZ2UvcG5nO2Jhc2U2NCxpVkJPUncwS0dnb0FBQUFOU1VoRVVnQUFBTUFBQUFEQUNBSUFBQURkdnZ0UUFBQUVqVWxFUVZSNG5PM2R5WTRWVlJ3RzhEN21ib3pHUnpDK0J5N2N5U3d5eFlVNGkvTXNEc3l6QXc2Sk81L0FwcHR1bWg0QTkvb0tybzB2Z2d1VHkwV0lTSC9kOTlTcCt2MTJiUHBXVWwrKzg2OXpLa1g1NmFuSFptQzlSak16dDJwZkF3MGJ6WlRhbDBETFJ2SkRRZ01SMFVCRU5CQ1JVUkVnQWcvVnZnRGFwb0dJYUNBaUdvaUlwekFpbGpBaWxqQWlHb2lJQmlKaWlDYmlNSldJQmlLaWdZaG9JQ0tld29qWUJ5S2lnWWhvSUNLR2FDS1dNQ0tXTUNJYWlJZ0dJcUtCaUhnS0l6SXF2ZzlFUUFNUjhUb0hFUTFFUklDSVdNS0lhQ0FpR29pSUJpTGlLSU9JdzFRaUdvaUlCaUtpZ2U3ajRJVXRjOGQrcjMwVjNWVitlZjdSMnRmUVVRZlBiNW44NTl4eE1icUhNaXRBZHpsd1ozVEc1bVhvTG1YMmtBRGQ0Y0M1ZTZkbmJQNkVHTjBtUUxmZE56cVR4T2dmNWZJTEFqU3ovK3dEUkdmU2xaTkRqMUc1L09LZ0E3VC96RHFqTTNibDFLQXpWT1lHSEtCOWNYckdGb1lhb3pMMzBoQUR0Ty8waGtWbjBzTHB3Y1dvekE4c1FIczNKenFURm9jVW96TC84bEFDdFBmVXBrZG5iUEhNVURKVXJyd3lpQUE5ZTNKNjZSbTdlcmIvTWVwL2dLcEVaMUsvWTFRV1h1MXRnUGFjcUJ5ZFNVdm4raG1qZmdhb1U5RVo2MldHeXNKcmZRdlFudU5kVE0vWTB2bGV4YWdzdnQ2ZkFEMXpyTlBSbVhUdFFrOWkxSk1BTlJTZHNYNWtxRnc5M0hhQWRoOXRMenFUbGkrMkhhTnk5ZkFqdGE5aG5YWWZmYkwySld5WTVZdS8xYjZFZFNwTGJ6UVpvRjFmOWljOVl5dGZ0UmVqc3ZSbVl3SGE5VVVQb3pPMjhuVmpHU3JYMmduUXpsNUhaOUpxT3pFcTE5NXFJRUE3UHg5S2RDYXRmdE5Bak1weTV3TzBZNURwR1Z2cmRveks4dHZkRGRDT3p3WWRuYkcxYjd1Ym9iTHlUaGNEdFAySTZQemI5VXRkakZIbkFpUTYvNjFyTVNvcjczWW9RTnMvbFo3LzVmcDNYWWxSV2UxR2dMYUp6Z082MFkwTWxkWDNLZ2RvMnllaXMzNDN2cThjbzdMMmZyVUFiZjFZZERiR3pSK3F4YWhhZ0tSbncxV0pVYm4rd2JRRDlQUkhvck5aZnYxeDJobWFhb0JFWnpxbUdhTnk0OE9hUS9UV1MzOVcvUFYrdUhua2lZcS83a1BqN2F0NkIvMVhCODJyZXdjMVVQdXEza0hmaVNiaU85SE5xM3NITFdIdE0wU1RNRVNUMFVBa05CQ1p5ZzBrUUkycmV3ZnRBeEhSUU0zVFFEUk1Beld2K2s3MHJacS9UNjdxSGJTRUViR0VOYzhRVGNNMFVQT3FEOUUxZjU0TjREQ1ZoTU5VTWhxSWhBWWk0M1VPRXZhQmFKZ2xySDJHYUJLRzZLbGFlKzd4VGYzN08yYi8ydFMvZncrR2FCS0dhQnFtZ1pxbmdXaVlCbXFlMXpuSTJBY2lZUitJakFZaW9ZSElHS0tKV01KSVdNTElhQ0FTR29pTTF6bElPRXlsWWFQaSswQ05xM3NITlJBUk0xRHp2TTVCeGhCTnV5eGh6Zk1ZVDhNMFVQTU0wV1FjcHBKd21FcEdBNUhRUUdTOHprSENQaEFOMDBETjAwQTB6QkRkUGtNMENVc1lEZE5BemF0N0I4c2ZQejljOC9kcG5BWWk0aW1NaU1OVUlocUlpQVlpb29HSUNCQVJTeGdSRFVSRUF4RVp6ZmcrRUFGSEdVUzh6a0ZFQXhIUlFFUTBFQkg3UUVUc0F4SFJRRVFNMFVRTTBVUXNZVVFNMFVRMEVCRU5SRVFERWZFVVJzUStFQkVOUkVRREVURkVFN0dFRWJHRUVkRkFSRFFRRVExRXhGTVlFWWVwUkRRUUVRMUVSQU1SK1J0aW02TDFRblZkSkFBQUFBQkpSVTVFcmtKZ2dnPT0iLCJzaXplcyI6IjE5MngxOTIiLCJ0eXBlIjoiaW1hZ2UvcG5nIiwicHVycG9zZSI6Im1hc2thYmxlIn0seyJzcmMiOiJkYXRhOmltYWdlL3BuZztiYXNlNjQsaVZCT1J3MEtHZ29BQUFBTlNVaEVVZ0FBQWdBQUFBSUFDQUlBQUFCN0drT3RBQUFNaFVsRVFWUjRuTzNkeDdKY1Z4WEg0Yk5kUGFHZ2VBU0s5NEFCTTh0SnpvSXFrNFBKWUlJSnpwbGdVakhqQ1N3clhXWEpjM2dGeGhRdmNobHg2eUlKM2U1N2QvYys2L3kvYitpQnF3Znkrbm1kZGJyVi92cTVUMDRBNUZsTjAvN296d0RBQUErTS9nQUFqQ0VBQUtFRUFDRFVhbXFqUHdJQUk2ek1mNEJNSGdFQmhCSUFnRkJ1QUFDaGJBQUFvUVFBSUpTM2dBQkMyUUFBUWprQ0E0U3lBUUNFRWdDQVVBSUFFR3JWM0FBQUl0a0FBRUlKQUVBb0FRQUlKUUFBb1h3UkRDQ1Uzd0lDQ09VUkVFQW9BUUFJNVFZQUVNb0dBQkJLQUFCQ2VRc0lJSlFOQUNDVUl6QkFLQnNBUUNnQkFBamxDQXdReWcwQUlKUkhRQUNoQkFBZ2xBQUFoQklBZ0ZDcjVnZ01FTWtHQUJCS0FBQkNDUUJBS0Y4RUF3aGxBd0FJNWJlQUFFTFpBQUJDdVFFQWhMSUJBSVFTQUlCUUFnQVF5bHRBQUtFY2dRRkNlUVFFRUVvQUFFSUpBRUFvTndDQVVONENBZ2psRVJCQUtBRUFDQ1VBQUtFY2dRRkNPUUlEaFBJSUNDQ1VBQUNFY2dNQUNHVURBQWdsQUFDaHZBVUVFTW9HQUJES0VSZ2dsQTBBSUpRQUFJUVNBSUJRcStZR0FCREpCZ0FRU2dBQVFna0FRQ2dCQUFqbGkyQUFvZndXRUVBb2o0QUFRZ2tBUUNnM0FJQlFxMm5hSC8wWkFCakFJeUNBVU40Q0FnaGxBd0FJNVFnTUVNb0dBQkJLQUFCQ0NRQkFLSDhqR0VBb0d3QkFLQUVBQ0NVQUFLRjhEd0FnbEorQ0FBamxFUkJBS0FFQUNDVUFBS0VjZ1FGQzJRQUFRbmtMQ0NDVURRQWdsQnNBUUNnYkFFQW9BUUFJSlFBQW9id0ZCQkRLRVJnZ2xFZEFBS0VFQUNDVUFBQ0VjZ01BQ09VdElJQlFIZ0VCaEJJQWdGQUNBQkRLRVJnZ2xBMkFhSjkvOXpPalB3SU0wejU0N2hPalB3TU1jT1ovUi8rNWwvOHg2cFBBS0RZQUVwMjU2My84Ny80bnNIanRneS9hQUFoeTVwMGpCdjI1VjZ3Q3BCQUFVaHc1K2crVEFSSUlBTXUzMGVnL29BRXNYanNyQUN6YXM4ZWEvZ2ZPeXdETEpRQXMxZ2xILzJFeXdDSzFzMThTQUpibTJiZTM4a3JQK1ZkbGdFWHhHaWhMczZYcHY5Vi9Nd3hoQTJBNWRqYWdyUUlzZ3dDd0JFUCszMXdHcUs1OStHVUJvTEJuM2hyNVdPYkNheHBBWVFKQVlXT24vd0Vab0NnQm9LU1pqUDdEWklCeUJJQmlaamo2RDJnQXRRZ0FsY3g1K2grUUFhcG9IMzVGQUNqZ21UY0xqUDdETHJ3dUE4eGRPeWNBek52VDFVYi9ZUmRsZ0JuelRXQm1yZlQwbitwL2ZwYk5Cc0JNTFd4MFdnV1lvWGJ1cXdMQXZEejl4cUpHLzJFWDM1QUJaa1FBbUpFRmovNERHc0I4Q0FCemtURDlEOGdBYzlET0N3Q2pQWlUwK2crN0pBTU0xYzUvVFFBWTVxblhRMGYvZ1V0dmFnRERDQUREbVA0SFpJQWhCSUFCalA1N2tnRjJUQURZS2FQL1NETEF6Z2dBTzJMMHIwOEQySTEyNGVzQ3dOWTkrWnJwdjdHOXQyU0E3UklBdHN2b1B5RVpZSHNFZ0cweCtudlJBTFpFQU5nSzA3ODdHYUM3ZHVFYkFrQlBUNzVxOUcvUjN0c3lRRGNDUURkRy8yNW9BTDIwaXdMQWlUMWg5Ty9jWlJuZ3hBU0Frekw5QjVJQlRrSUFPRDZqZnlaa2dPTnBGNzhwQUd6c2lWZU0vbm01L0k0R3NERUJZR09tLzJ6SkFCdHBsd1NBdFQxdTlGZHdSUVpZandDd0ZxTy9GZzFnSGUzU3R3U0ErM244WmFPL3FpdnZ5Z0QzSXdEY2orbS9BRExBL3lNQTNKdlJ2eVFhd0QwSkFIY3krcGRLQnJoRDJ4TUFEamx0K2kvZFZSbmd2OXJlOHdMQU5FM1Q2WmVNL2lCWDM1TUJwcmIzL01kSGZ3WUdPLzNTWjBkL0JBYTQrdDdmUjM4RUJoT0FkS1ovT0JsSUpnQzVqSDRPeUVDbXR2ZHRBWWh6K3RkR1AzZTYraHNOaU5NdUMwQ1N4NHgrN3V1YURDUVJnQ0NtUDJ1U2dSQUNFTUhvWjFNYWtFQUFGczdvNXlSa1lObmE1ZThJd0dJOTlpdlRudzZ1L1ZZR2xra0Fsc25vcHpzWldKNTJSUUNXNVZHam42MjVyZ0hMSWdETFlmU3pHekt3R08zS2R3VmdDUjc5cGVuUFRsMy9uUXlVSndEbEdmMk1vZ0hWQ1VCaFJqOXpJQU4xQ1VCVnBqK3pJZ01WdGF2ZkU0QmlIdm1GMGM4YzNmaTlCaFFqQUpVWS9jeWZEQlFpQURVWS9kUWlBeVVJUUFHbVAwWEp3TXdKd0t3Wi9WU25BWFBXcm4xZkFPYm80UmVOZnBiajV2c3lNRWNDTUVlbVA0c2tBM01qQVBOaTlMTnNHakFyQWpBWFJqODVaR0FtMnJVZkNNQmdELy9jNkNmUnpUL0l3R0FQalA0QTZVeC9Zdm5EUDF5N2JnTVk1Q0YvK21HYXBtbTZaUlVZUkFBR01Qcmhiakt3ZXdLd2E2WS8zSWNNN0ZLNy9rTUIySkdIZm1iMHc5RnUvVkVEZGtRQWRzSG9oMDNKd0E0SXdOYVovbkJzTXJCVjdZWUFiTTBwb3g5TzdMWUdiRTI3OFNNQjZPL1VUNDErNk9uMm4yU2dQd0hvek9pSDdaR0J2bndUdUNmVEg3YktmMko5MlFENjhPY1Nkc2txMElVQW5KVFJENlBJd0FtMW16OFdnT043OENlbVB3ejIwWjlsNEpnRTRKaU1mcGdQRFRnZUFkaVkwUS96SkFPYkVvQU5HUDB3ZnpLd3ZuYnpCUUZZeTRNdm1QNVF3MGQvMFlDMUNNRFJqSDZvU0FhTzFHNEpRRmVuM3YvWDZJOEFpM1g3eFUrUC9naUw0cHZBQUtFRUFDRFVhbXFqUHdMQW1zeXJybXdBQUtFRUFDRFV5a1lGVkdGZTllVUdBTlJoWG5YbEVSQkFLQUVBQ0NVQUFLRWNnWUV5ekt1K0hJR0JPc3lycmp3Q0FnZ2xBQUNoQkFBZ2xCc0FVSWQ1MVpXM2dJQXl6S3UrUEFJQ0NDVUFBS0hjQUlBNnpLdXViQUFBb1FRQUlKUzNnSUF5ekt1K2JBQUFvUnlCZ1RyTXE2NXNBQUNoQkFBZ2xBQUFoRm8xejlTQUlzeXJ2bXdBQUtFRUFDQ1VBQUNFRWdDQVVMNElCdFJoWG5YbHQ0Q0FNc3lydmp3Q0FnZ2xBQUNoM0FDQU9zeXJybXdBQUtFY2dZRXl6S3UrVnRPMFAvb3pBS3pKdk9ySkl5Q0FVSTdBUUIzbVZWYzJBSUJRQWdBUXlsdEFRQm5tVlY5dUFFQWQ1bFZYSGdFQmhCSUFnRkFDQUJCS0FBQkNyWnFqQ2xDRWVkV1hEUUFnbEFBQWhCSUFnRkMrQ0FiVVlWNTFaUU1BQ09XM2dJQXl6S3UrYkFBQW9RUUFJSlFqTUZDSGVkV1ZEUUFnbEFBQWhQSVdFRkNHZWRXWEd3QlFoM25WbFVkQUFLRUVBQ0NVQUFDRWNnTUE2akN2dXZJV0VGQ0dlZFdYUjBBQW9RUUFJSlFBQUlSeUJBYnFNSys2Y2dRR3lqQ3YrdklJQ0NDVUFBQ0VjZ01BNmpDdnVySUJBSVFTQUlCUTNnSml2QnRmK05Ub2p6REFJMmYvUGZvajFHTmU5V1VEQUFqbENBelVZVjUxWlFNQUNDVUFBS0VFQUNEVXFubW1CaFJoWHZWbEF3QUlKUUFBb1FRQUlKUUFBSVR5UlRDZ0R2T3FLNzhGQkpSaFh2WGxFUkJBS0FFQUNPVUdBTlJoWG5WbEF3QUlKUUFBb2J3RkJKUmhYdlZsQXdBSTVRZ00xR0ZlZFdVREFBZ2xBQUNoSElHQk1zeXJ2dHdBZ0RyTXE2NDhBZ0lJSlFBQW9RUUFJSlFBQUlSYU5VY1ZvQWp6cWk4YkFFQW9BUUFJSlFBQW9Yd1JES2pEdk9yS0JnQVF5bThCQVdXWVYzM1pBQUJDdVFFQWRaaFhYZGtBQUVJSkFFQW9BUUFJNVMwZ29BenpxaTlIWUtBTzg2b3JqNEFBUWdrQVFLalZOTzJQL2d3QWF6S3ZlbklEQU9vd3I3cnlGaEJRaG5uVmx4c0FRQ2dCQUFnbEFBQ2hISUdCT3N5cnJtd0FBS0c4QlFTVVlWNzFaUU1BQ09VR0FOUmhYblZsQXdBSUpRQUFvUnlCZ1RMTXE3NXNBQUNoSElHQk9zeXJybXdBQUtFRUFDQ1VBQUNFV2pYUDFJQWl6S3UrYkFBQW9RUUFJSlFBQUlRU0FJQlF2Z2dHMUdGZWRlVzNnSUF5ekt1K1BBSUNDQ1VBQUtIY0FJQTZ6S3V1YkFBQW9RUUFJSlMzZ0lBeXpLdSszQUNBT3N5cnJqd0NBZ2dsQUFDaEJBQWdsQUFBaFBJM2dnRmxtRmQ5MlFBQVFna0FRQ2dCQUFqbGkyQkFIZVpWVjM0S0FpakR2T3JMSXlDQVVBSUFFRW9BQUVJNUFnTjFtRmRkMlFBQVFua0xDQ2pEdk9yTEJnQVF5ZzBBcU1PODZzb0dBQkJLQUFCQ0NRQkFLRzhCQVdXWVYzMDVBZ04xbUZkZGVRUUVFRW9BQUVLMWYvN3RZNk0vQXdBRHVBRUFoUElXRUVBb053Q0FVQUlBRUVvQUFFSTVBZ09Fc2dFQWhQSVdFRUFvR3dCQUtEY0FnRkEyQUlCUUFnQVFTZ0FBUW5rTENDQ1VJekJBS0krQUFFSUpBRUFvQVFBSXRXcHVBQUNSYkFBQW9RUUFJSlFBQUlUeVBRQ0FVRFlBZ0ZCK0NnSWdsQTBBSU5ScW12Wkhmd1lBQm5BRUJnamxFUkJBS0FFQUNPVXRJSUJRYmdBQW9Ud0NBZ2dsQUFDaEJBQWdsQUFBaFBJM2dnR0VzZ0VBaEJJQWdGQUNBQkRLRjhFQVF0a0FBRUw1TFNDQVVEWUFnRkFDQUJES0VSZ2dsQTBBSUpRak1FQW9Hd0JBS0RjQWdGQTJBSUJRQWdBUVNnQUFRbmtMQ0NDVUl6QkFLSStBQUVJSkFFQW9BUUFJNVFZQUVNcGJRQUNoUEFJQ0NDVUFBS0VFQUNDVUl6QkFLQnNBUUNodkFRR0VzZ0VBaEhJREFBaGxBd0FJSlFBQW9RUUFJTlNxdVFFQVJMSUJBSVFTQUlCUUFnQVFTZ0FBUXZraUdFQW92d1VFRU1vaklJQlFBZ0FReWcwQUlKUU5BQ0NVSXpCQUtCc0FRQ2dCQUFqbENBd1F5Z1lBRUVvQUFFSjVDd2dnbEJzQVFDaVBnQUJDQ1FCQUtBRUFDQ1VBQUtGV3pSRVlJSklOQUNDVUFBQ0VFZ0NBVUw0SUJoREtCZ0FReW04QkFZU3lBUUNFRWdDQVVJN0FBS0ZzQUFDaEJBQWdsTGVBQUVLNUFRQ0U4Z2dJSUpRQUFJUVNBSUJRL3dGa01JeW5BQzM2aHdBQUFBQkpSVTVFcmtKZ2dnPT0iLCJzaXplcyI6IjUxMng1MTIiLCJ0eXBlIjoiaW1hZ2UvcG5nIiwicHVycG9zZSI6Im1hc2thYmxlIn1dfQ==">
+<meta name="theme-color" content="#92400E">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Depot Manager">
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAIAAADdvvtQAAAEjElEQVR4nO3dx44dRRgF4Ck0CyQQj4B4D7NgB44YJ7EgB5MzJjhnggkS74CwZzz2eIJt9vAcIF7ELGBxfTEYz+m51d31fTtv7rRUR6f+7mq1yw+PPTQHGzU/N3er9jUwYPNzpfYlMGTz8kNCAxHRQEQ0EJH5IkAE7qt9AQybBiKigYhoICLuwojYwojYwohoICIaiIghmojDVCIaiIgGIqKBiLgLI+I5EBENREQDETFEE7GFEbGFEdFARDQQEQ1ExF0Ykfni+0AENBARr3MQ0UBEBIiILYyIBiKigYhoICKOMog4TCWigYhoICIa6C4OnNuycOTX2lfRX+WnZx6sfQ09deDslsl/LhwVozsoFwXodvtvz80/LUrShHLxWQH62/4zd4nOpMVjYjQ3J0B/uafoTBKjcum5dgO07/QGczPl8vF2Y1QuPd9igPad6iY6Uy6faC5JZaGxAO3dnOhMWmopRmXhhSYCtPfkpudmytLJJmJUFsceoD0zj86UK6NOUll8cbQB2nOicnQmXTk1zhiVyy+NLUBPHe9RbqZcPT22GI0qQH2OzpTRJKksvTyGAO0+NpjoTFo+M/gYDTtAA83NlEHHqCy9MsgA7T46huhMWj47yBiVK68OLEBPHhlbdKZcOzekJA0pQKOPzqShxKhcPdj3AO063FBupqyc73uMytWDD9S+hn+16/CjtS+hL1bO/1L7Eu6sLL/WxwDt/Fx07mD1i97FqCy/3qMA7fxMbu5u9csexahc60eAdojOPVrrR4zKtTcqB2jHp6ITWfuqZpLKSqUAbZebTq1XilFZeXPWAdr+iehslvWvZx2jsvrW7AK07ZDozMj1CzNK0iwCJDe1zCBGZfXtTQzQto9Fp77r32xijMra5gRoq+j0z41NSFJZe6fLAG39SG767sa3XcaorL/bTYCe+FB0huTmd93EqIMAic5w5TEq19/bYIAe/0BuxuPn7zeYpI0ESHTGagMxKjfe72AGeuLC7/mPMGM3Dz2S/4gPjTesi6X3Xx20q5Ol10AN62LpfSeaiO9Et6uTpbeFNcwQTcIQTUYDkdBAZLppIAFqVSdL7zkQEQ3ULg1EfRqoXV09ib7Vwc8wRF0svS2MiC2sXYZo6tNA7fI6BxmHqSQcppLRQCQ0EBmvc5DwHIj6bGENM0STMESTMUSTMERTnwZqlwaiPg3ULq9zkPEciITnQGQ00P+x/vTDFf/69ot/VPzr/00DkTFEE7GFkbCFkdFAJDQQGa9zkHCYSn3zxfeBWtXJ0msgImagdnmdg4whmupsYe1yG099GqhdhmgyDlNJOEwlo4FIaCAyXucg4TkQ9Wmgdmkg6jNEN8wQTcIWRn0aqF0aiPo0ULu8zkHGYSoJh6lkNBAJDUTGEE3EFkbCFkZGA5HoqoF8H6hVXSy9o4x2OUylPg3ULg1EfRqoXV7nIOM5EIlOlr789uP9XfwOjTJEEzFEEzFEEzFEE9FARDQQEQ1ExF0YEc+BiGggIhqIiCGaiC2MiC2MiAYiooGIaCAi7sKIOEwlooGIaCAiGojInwnepBkPlpFsAAAAAElFTkSuQmCC">
+<link rel="icon" type="image/png" sizes="192x192" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAIAAADdvvtQAAAEjElEQVR4nO3dx44dRRgF4Ck0CyQQj4B4D7NgB44YJ7EgB5MzJjhnggkS74CwZzz2eIJt9vAcIF7ELGBxfTEYz+m51d31fTtv7rRUR6f+7mq1yw+PPTQHGzU/N3er9jUwYPNzpfYlMGTz8kNCAxHRQEQ0EJH5IkAE7qt9AQybBiKigYhoICLuwojYwojYwohoICIaiIghmojDVCIaiIgGIqKBiLgLI+I5EBENREQDETFEE7GFEbGFEdFARDQQEQ1ExF0Ykfni+0AENBARr3MQ0UBEBIiILYyIBiKigYhoICKOMog4TCWigYhoICIa6C4OnNuycOTX2lfRX+WnZx6sfQ09deDslsl/LhwVozsoFwXodvtvz80/LUrShHLxWQH62/4zd4nOpMVjYjQ3J0B/uafoTBKjcum5dgO07/QGczPl8vF2Y1QuPd9igPad6iY6Uy6faC5JZaGxAO3dnOhMWmopRmXhhSYCtPfkpudmytLJJmJUFsceoD0zj86UK6NOUll8cbQB2nOicnQmXTk1zhiVyy+NLUBPHe9RbqZcPT22GI0qQH2OzpTRJKksvTyGAO0+NpjoTFo+M/gYDTtAA83NlEHHqCy9MsgA7T46huhMWj47yBiVK68OLEBPHhlbdKZcOzekJA0pQKOPzqShxKhcPdj3AO063FBupqyc73uMytWDD9S+hn+16/CjtS+hL1bO/1L7Eu6sLL/WxwDt/Fx07mD1i97FqCy/3qMA7fxMbu5u9csexahc60eAdojOPVrrR4zKtTcqB2jHp6ITWfuqZpLKSqUAbZebTq1XilFZeXPWAdr+iehslvWvZx2jsvrW7AK07ZDozMj1CzNK0iwCJDe1zCBGZfXtTQzQto9Fp77r32xijMra5gRoq+j0z41NSFJZe6fLAG39SG767sa3XcaorL/bTYCe+FB0huTmd93EqIMAic5w5TEq19/bYIAe/0BuxuPn7zeYpI0ESHTGagMxKjfe72AGeuLC7/mPMGM3Dz2S/4gPjTesi6X3Xx20q5Ol10AN62LpfSeaiO9Et6uTpbeFNcwQTcIQTUYDkdBAZLppIAFqVSdL7zkQEQ3ULg1EfRqoXV09ib7Vwc8wRF0svS2MiC2sXYZo6tNA7fI6BxmHqSQcppLRQCQ0EBmvc5DwHIj6bGENM0STMESTMUSTMERTnwZqlwaiPg3ULq9zkPEciITnQGQ00P+x/vTDFf/69ot/VPzr/00DkTFEE7GFkbCFkdFAJDQQGa9zkHCYSn3zxfeBWtXJ0msgImagdnmdg4whmupsYe1yG099GqhdhmgyDlNJOEwlo4FIaCAyXucg4TkQ9Wmgdmkg6jNEN8wQTcIWRn0aqF0aiPo0ULu8zkHGYSoJh6lkNBAJDUTGEE3EFkbCFkZGA5HoqoF8H6hVXSy9o4x2OUylPg3ULg1EfRqoXV7nIOM5EIlOlr789uP9XfwOjTJEEzFEEzFEEzFEE9FARDQQEQ1ExF0YEc+BiGggIhqIiCGaiC2MiC2MiAYiooGIaCAi7sKIOEwlooGIaCAiGojInwnepBkPlpFsAAAAAElFTkSuQmCC">
 <style>
   :root{
     /* ── Yellow / Amber Theme ── */
@@ -23,11 +31,15 @@
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
+  html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
   body{
     background:var(--cream);
     color:var(--ink);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    font-size:14.5px;
+    line-height:1.45;
     padding-bottom:70px;
   }
   h1,h2,h3,.display{
@@ -57,13 +69,13 @@
   .brandbar .datestamp{font-size:11px; color:rgba(255,255,255,.6); text-align:right; white-space:nowrap;}
 
   /* ── Layout ── */
-  .container{padding:0 14px; max-width:560px; margin:0 auto;}
+  .container{padding:0 12px; max-width:560px; margin:0 auto;}
   .card{
     background:var(--paper); border:1px solid var(--line); border-radius:10px;
-    padding:14px 14px 10px; margin-bottom:12px; box-shadow:var(--shadow);
+    padding:12px 12px 9px; margin-bottom:10px; box-shadow:var(--shadow);
   }
-  .card h2{font-size:16px; margin:0 0 10px 0; color:var(--amber-dark);}
-  .card h2 .sub{font-size:12px; font-weight:400; color:var(--loam); margin-left:6px;}
+  .card h2{font-size:15.5px; margin:0 0 8px 0; color:var(--amber-dark); line-height:1.25;}
+  .card h2 .sub{font-size:11.5px; font-weight:400; color:var(--loam); margin-left:6px;}
 
   /* ── Stat Grid ── */
   .stat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:-6px 14px 10px; position:relative; z-index:2;}
@@ -71,24 +83,71 @@
     background:#fff; border:1px solid var(--line); border-radius:8px;
     padding:10px 8px; text-align:center; box-shadow:var(--shadow);
   }
-  .stat .num{font-size:22px; font-weight:800; color:var(--amber-dark); font-family: Georgia, serif;}
+  .stat .num{font-size:22px; font-weight:800; color:var(--amber-dark); font-family: Georgia, serif; font-variant-numeric:tabular-nums; line-height:1.15;}
   .stat .lbl{font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; color:var(--loam); margin-top:2px;}
 
-  /* ── Tabs ── */
-  nav.tabs{
-    display:flex; gap:0; overflow-x:auto; -webkit-overflow-scrolling:touch;
-    border-bottom:2px solid var(--line); margin-bottom:12px;
-    scrollbar-width:none;
+  /* ── Install App Banner ── */
+  .install-banner{
+    display:flex; align-items:center; gap:10px;
+    background:#fff; border:1px solid var(--gold); border-radius:10px;
+    padding:10px 12px; margin:0 0 10px; box-shadow:var(--shadow);
+    font-size:12.5px; color:var(--loam); line-height:1.35;
   }
-  nav.tabs::-webkit-scrollbar{display:none;}
+  .install-banner span{flex:1;}
+  .install-banner-close{
+    background:none; border:none; color:#a49b8c; font-size:14px; padding:2px 4px;
+    cursor:pointer; line-height:1;
+  }
+
+  /* ── Hamburger button ── */
+  .hamburger-btn{
+    display:flex; flex-direction:column; justify-content:center; align-items:center; gap:4px;
+    width:34px; height:34px; padding:0; margin-right:10px; flex-shrink:0;
+    background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); border-radius:8px;
+    cursor:pointer; position:relative; z-index:1;
+  }
+  .hamburger-btn span{display:block; width:16px; height:2px; background:#fff; border-radius:2px;}
+  .brandbar .top{gap:8px;}
+  .brandbar .brandtext{flex:1; min-width:0;}
+
+  /* ── Drawer overlay ── */
+  .drawer-overlay{
+    display:none; position:fixed; inset:0; background:rgba(46,42,36,.45);
+    z-index:40; opacity:0; transition:opacity .2s ease;
+  }
+  .drawer-overlay.open{display:block; opacity:1;}
+
+  /* ── Tabs → off-canvas drawer ── */
+  nav.tabs{
+    display:flex; flex-direction:column; gap:0;
+    position:fixed; top:0; left:0; height:100%; width:78vw; max-width:280px;
+    background:var(--paper); border-right:1px solid var(--line);
+    box-shadow:2px 0 16px rgba(46,42,36,.18);
+    transform:translateX(-100%); transition:transform .22s ease;
+    z-index:50; overflow-y:auto; margin-bottom:0; border-bottom:none;
+    padding-bottom:16px;
+  }
+  nav.tabs.open{transform:translateX(0);}
+  .drawer-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 14px; background:linear-gradient(135deg, var(--amber-dark) 0%, var(--amber-deeper) 100%);
+    color:#fff; margin-bottom:6px;
+  }
+  .drawer-brand{font-family:Georgia,serif; font-weight:700; font-size:16px;}
+  .drawer-close{
+    background:rgba(255,255,255,.15); border:none; color:#fff; width:28px; height:28px;
+    border-radius:7px; font-size:14px; cursor:pointer; line-height:1;
+  }
   nav.tabs button{
-    flex:1; min-width:max-content; padding:10px 12px; border:none; background:none;
-    font-size:13px; font-weight:700; color:var(--loam); cursor:pointer;
-    border-bottom:3px solid transparent; margin-bottom:-2px; white-space:nowrap;
+    display:flex; align-items:center; gap:10px;
+    width:100%; text-align:left; padding:12px 16px; border:none; background:none;
+    font-size:14.5px; font-weight:700; color:var(--loam); cursor:pointer;
+    border-left:3px solid transparent; white-space:nowrap;
     transition: color .15s, border-color .15s, background .15s;
   }
+  nav.tabs button .di{font-size:16px; width:20px; text-align:center; flex-shrink:0;}
   nav.tabs button.active{
-    color:var(--amber-dark); border-bottom-color:var(--gold);
+    color:var(--amber-dark); border-left-color:var(--gold);
     background: rgba(234,179,8,.08);
   }
   .tabpanel{display:none;}
@@ -96,7 +155,7 @@
   @keyframes fadeIn{ from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
 
   /* ── Form Elements ── */
-  label{display:block; font-size:12px; font-weight:700; color:var(--loam); margin-bottom:4px; margin-top:10px;}
+  label{display:block; font-size:12px; font-weight:700; color:var(--loam); margin-bottom:4px; margin-top:8px; line-height:1.3;}
   label:first-child{margin-top:0;}
   input[type="text"],input[type="number"],input[type="date"],input[type="tel"],select{
     width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:7px;
@@ -129,12 +188,12 @@
   .btn-block{width:100%; text-align:center;}
   .btn-sm{padding:5px 10px; font-size:11px; margin-top:0;}
 
-  table{width:100%; border-collapse:collapse; margin-top:8px; font-size:13px;}
-  th{text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; color:var(--loam); border-bottom:2px solid var(--line); padding:5px 6px;}
-  td{padding:7px 6px; border-bottom:1px solid var(--line);}
+  table{width:100%; border-collapse:collapse; margin-top:6px; font-size:13px; font-variant-numeric:tabular-nums;}
+  th{text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; color:var(--loam); border-bottom:2px solid var(--line); padding:4px 6px;}
+  td{padding:6px 6px; border-bottom:1px solid var(--line); line-height:1.35;}
   tr:last-child td{border-bottom:none;}
   tr:hover td{background:rgba(234,179,8,.04);}
-  .muted{color:#8a8072; font-size:12px;}
+  .muted{color:#8a8072; font-size:12px; line-height:1.35;}
   .pill{display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700;}
   .pill.low{background:#FEE2E2; color:var(--rust);}
   .pill.ok{background:#FEF9C3; color:var(--amber-dark);}
@@ -170,14 +229,14 @@
   }
   .item-row:hover{background:rgba(234,179,8,.06); box-shadow: 0 1px 4px rgba(234,179,8,.15);}
   .item-row .name{font-weight:700; font-size:14px;}
-  .item-row .bal{font-weight:700; font-size:14px; color:var(--amber-dark);}
+  .item-row .bal{font-weight:700; font-size:14px; color:var(--amber-dark); font-variant-numeric:tabular-nums;}
   .worker-card{border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:8px; background:#fff; transition: box-shadow .15s;}
   .worker-card:hover{box-shadow: 0 1px 4px rgba(234,179,8,.12);}
   .worker-card .top{display:flex; justify-content:space-between; align-items:center;}
   .worker-card .name{font-weight:700;}
   .worker-card .role{font-size:11px; color:var(--loam); text-transform:uppercase;}
   .worker-card .meta{font-size:11px; color:#8a8072; margin-top:2px;}
-  .worker-card .owed{font-weight:700; color:var(--amber-dark);}
+  .worker-card .owed{font-weight:700; color:var(--amber-dark); font-variant-numeric:tabular-nums;}
   .footer-note{text-align:center; font-size:11px; color:#a49b8c; margin:20px 0 4px 0;}
 
   /* Payroll total row */
@@ -192,7 +251,7 @@
     align-items: center;
   }
   .payroll-total .label{font-weight:700; color:var(--amber-dark); font-size:14px;}
-  .payroll-total .amount{font-weight:800; color:var(--amber-deeper); font-size:18px; font-family: Georgia, serif;}
+  .payroll-total .amount{font-weight:800; color:var(--amber-deeper); font-size:18px; font-family: Georgia, serif; font-variant-numeric:tabular-nums;}
 
   /* ── Smooth scrollbar for tables ── */
   .card { overflow: hidden; }
@@ -259,115 +318,148 @@
     background:#FDE047; color:#78350F; transform:scale(.97);
   }
   .splash .footnote{ margin-top:16px; font-size:10px; color:rgba(255,255,255,.5); }
+
+  /* ── Narrow phones: reclaim width, never shrink readable text ── */
+  @media (max-width: 360px){
+    .container{padding:0 10px;}
+    .card{padding:10px 10px 8px;}
+    .stat-grid{gap:6px; margin:-6px 10px 10px;}
+    .stat{padding:8px 6px;}
+    .row2,.row3,.row4{gap:8px;}
+  }
 </style>
 </head>
 <body>
 
 <!-- ════════ LANDING / SPLASH PAGE ════════ -->
-<div class="splash" id="splash">
+<div class="splash hide" id="splash" style="display: none;">
   <div class="logo-ring">
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18l7 3.5v7.64l-7 3.5-7-3.5V7.68l7-3.5zM12 6a4 4 0 100 8 4 4 0 000-8zm0 2a2 2 0 110 4 2 2 0 010-4zm-5 9.5c0-1.38 2.24-2.5 5-2.5s5 1.12 5 2.5v1.5H7v-1.5z"/></svg>
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18l7 3.5v7.64l-7 3.5-7-3.5V7.68l7-3.5zM12 6a4 4 0 100 8 4 4 0 000-8zm0 2a2 2 0 110 4 2 2 0 010-4zm-5 9.5c0-1.38 2.24-2.5 5-2.5s5 1.12 5 2.5v1.5H7v-1.5z"></path></svg>
   </div>
   <h1>Satellite Depot Manager</h1>
   <div class="tagline">Complete offline depot management solution</div>
   <div class="features">
     <div class="feat">
-      <div class="icon">&#127806;</div>
+      <div class="icon">🌾</div>
       <div class="ft">Grain Tracking</div>
       <div class="fd">Purchase &amp; dispatch records with full transporter &amp; driver details</div>
     </div>
     <div class="feat">
-      <div class="icon">&#129295;</div>
-      <div class="ft">Equipment Control</div>
+      <div class="icon">🤏</div>
+      <div class="ft">Equipment and Requisites Control</div>
       <div class="fd">Track transfers in, issues, damages with low-stock alerts</div>
     </div>
     <div class="feat">
-      <div class="icon">&#128119;</div>
+      <div class="icon">👷</div>
       <div class="ft">Staff &amp; Work Logs</div>
       <div class="fd">NRC, categories, 5 task types with daily bag logging</div>
     </div>
     <div class="feat">
-      <div class="icon">&#128176;</div>
+      <div class="icon">💰</div>
       <div class="ft">Payroll Calculator</div>
       <div class="fd">Auto-calculate wages per task/crop with breakdown &amp; WhatsApp share</div>
     </div>
     <div class="feat">
-      <div class="icon">&#128202;</div>
+      <div class="icon">📊</div>
       <div class="ft">Reports</div>
       <div class="fd">Generate period reports, copy or share via WhatsApp</div>
     </div>
     <div class="feat">
-      <div class="icon">&#128274;</div>
+      <div class="icon">🔒</div>
       <div class="ft">Secure &amp; Offline</div>
       <div class="fd">PIN-protected deletes, data backup/restore, works without internet</div>
     </div>
   </div>
   <button class="enter-btn" id="enterAppBtn">Enter App</button>
-  <div class="footnote">Nexlite Digital Solutions &middot; v3</div>
+  <div class="footnote">Nexlite Digital Solutions · v3</div>
 </div>
 <!-- ════════ END SPLASH ════════ -->
 
 <div class="brandbar">
   <div class="top">
-    <div>
+    <button class="hamburger-btn" id="hamburgerBtn" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="brandtext">
       <div class="eyebrow">Satellite Depot</div>
-      <h1 id="depotTitle">Depot Manager</h1>
-      <div class="depotline" id="depotSubline">Set up your depot in Settings</div>
+      <h1 id="depotTitle">Mutipula</h1>
+      <div class="depotline" id="depotSubline">Mwense, Luapula</div>
     </div>
-    <div class="datestamp" id="todayStamp"></div>
+    <div class="datestamp" id="todayStamp">15 Jul 2026</div>
   </div>
 </div>
 
+<div class="drawer-overlay" id="drawerOverlay"></div>
+
 <div class="container">
-  <div class="stat-grid" id="dashStats"></div>
+  <div class="stat-grid" id="dashStats"><div class="stat"><div class="num">0</div><div class="lbl">Maize</div></div><div class="stat"><div class="num">0</div><div class="lbl">Soyabeans</div></div><div class="stat"><div class="num">0</div><div class="lbl">Rice</div></div></div>
+  <div class="install-banner" id="installBanner" style="display:none;">
+    <span id="installBannerText">Install this app on your phone for one-tap access and offline use.</span>
+    <button class="btn btn-gold btn-sm" id="installBannerBtn" type="button" style="margin:0; white-space:nowrap;">Install</button>
+    <button class="install-banner-close" id="installBannerClose" type="button" aria-label="Dismiss">✕</button>
+  </div>
 </div>
 
 <nav class="tabs" id="tabs">
-  <button data-tab="dashboard" class="active">Dashboard</button>
-  <button data-tab="grain">Grain</button>
-  <button data-tab="equipment">Equipment</button>
-  <button data-tab="staff">Staff</button>
-  <button data-tab="payroll">Payroll</button>
-  <button data-tab="reports">Reports</button>
-  <button data-tab="settings">Settings</button>
+  <div class="drawer-head">
+    <span class="drawer-brand">Menu</span>
+    <button class="drawer-close" id="drawerCloseBtn" aria-label="Close menu">✕</button>
+  </div>
+  <button data-tab="dashboard" class=""><span class="di">📊</span>Dashboard</button>
+  <button data-tab="grain"><span class="di">🌾</span>Grain</button>
+  <button data-tab="equipment"><span class="di">🧰</span>Equipment and Requisites</button>
+  <button data-tab="staff"><span class="di">👥</span>Staff</button>
+  <button data-tab="payroll" class=""><span class="di">💵</span>Payroll</button>
+  <button data-tab="reports" class=""><span class="di">📋</span>Reports</button>
+  <button data-tab="settings" class="active"><span class="di">⚙️</span>Settings</button>
 </nav>
 
-<div class="container">
+<div class="container" style="margin-top:14px;">
 
   <!-- DASHBOARD -->
-  <div class="tabpanel active" id="tab-dashboard">
+  <div class="tabpanel" id="tab-dashboard">
     <div class="card">
       <h2>Grain Balances</h2>
-      <div id="dashGrain"></div>
+      <div id="dashGrain"><table><thead><tr><th>Crop</th><th>Purchased</th><th>Dispatched</th><th>Balance</th></tr></thead><tbody><tr><td>Maize</td><td>0</td><td>0</td><td><b>0</b></td></tr><tr><td>Soyabeans</td><td>0</td><td>0</td><td><b>0</b></td></tr><tr><td>Rice</td><td>0</td><td>0</td><td><b>0</b></td></tr></tbody></table></div>
     </div>
     <div class="card">
-      <h2>Equipment Alerts</h2>
-      <div id="dashEquip"></div>
+      <h2>Equipment and Requisites Alerts</h2>
+      <div id="dashEquip"><div style="margin-bottom:6px;">Bags: <span class="pill low">0 left</span></div><div style="margin-bottom:6px;">Twine: <span class="pill low">0 left</span></div><div style="margin-bottom:6px;">Sieves: <span class="pill low">0 left</span></div><div style="margin-bottom:6px;">Tents: <span class="pill low">0 left</span></div><div style="margin-bottom:6px;">Scales: <span class="pill low">0 left</span></div></div>
     </div>
     <div class="card">
       <h2>Wages Outstanding</h2>
-      <div id="dashWages"></div>
+      <div id="dashWages"><div class="empty">No workers logged yet.</div></div>
     </div>
   </div>
 
   <!-- GRAIN -->
   <div class="tabpanel" id="tab-grain">
-    <div class="crop-select" id="cropSelect"></div>
+    <div class="crop-select" id="cropSelect"><button data-crop="Maize" class="active">Maize</button><button data-crop="Soyabeans">Soyabeans</button><button data-crop="Rice">Rice</button></div>
 
     <div class="card">
-      <h2 id="grainBalanceHeading">Balance</h2>
-      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);" id="grainBalanceStats"></div>
+      <h2 id="grainBalanceHeading">Maize <span class="sub">bags</span></h2>
+      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);" id="grainBalanceStats"><div class="stat"><div class="num">0</div><div class="lbl">Purchased (bags)</div></div><div class="stat"><div class="num">0.00 t</div><div class="lbl">Purchased (tonnes)</div></div><div class="stat"><div class="num">0</div><div class="lbl">Dispatched (bags)</div></div><div class="stat"><div class="num">0</div><div class="lbl">Balance (bags)</div></div></div>
     </div>
 
     <div class="card">
       <h2>Record Purchase <span class="sub">bags bought from farmers today</span></h2>
       <form id="purchaseForm">
         <div class="row2">
-          <div><label>Date</label><input type="date" name="date" required></div>
-          <div><label>Bags purchased</label><input type="number" name="bags" min="0" step="1" required></div>
+          <div><label>Date</label><input type="date" name="date" required=""></div>
+          <div>
+            <label>Quantity purchased</label>
+            <div style="display:flex; gap:6px;">
+              <input type="number" id="purchaseQty" min="0" step="0.01" required="" style="flex:1;">
+              <select id="purchaseQtyUnit" style="flex:0 0 84px; width:84px;">
+                <option value="bags" selected="selected">Bags</option>
+                <option value="tonnes">Tonnes</option>
+              </select>
+            </div>
+            <div class="muted" id="purchaseQtyConverted" style="margin-top:3px;"></div>
+          </div>
         </div>
         <label>Price per bag (K)</label>
-        <input type="number" name="price" min="0" step="0.01" required>
+        <input type="number" name="price" min="0" step="0.01" required="">
         <button class="btn btn-primary btn-block" type="submit">Add Purchase</button>
       </form>
     </div>
@@ -376,11 +468,11 @@
       <h2>Record Dispatch <span class="sub">grain leaving the depot</span></h2>
       <form id="dispatchForm">
         <div class="row2">
-          <div><label>Date</label><input type="date" name="date" required></div>
-          <div><label>Quantity (bags)</label><input type="number" name="bags" min="0" step="1" required></div>
+          <div><label>Date</label><input type="date" name="date" required=""></div>
+          <div><label>Quantity (bags)</label><input type="number" name="bags" min="0" step="1" required=""></div>
         </div>
         <label>Destination</label>
-        <input type="text" name="destination" placeholder="e.g. Mansa Regional Depot" required>
+        <input type="text" name="destination" placeholder="e.g. Mansa Regional Depot" required="">
         <div class="row2">
           <div><label>Transporter Company</label><input type="text" name="transporter" placeholder="e.g. XYZ Logistics"></div>
           <div><label>Truck reg / IDT/IPT Number</label><input type="text" name="waybill" placeholder="e.g. ABC 1234 / IDT-0234"></div>
@@ -398,55 +490,68 @@
       <h2>Damaged Empty Bags <span class="sub">torn / unusable empty grain bags</span></h2>
       <form id="damagedBagForm">
         <div class="row2">
-          <div><label>Date</label><input type="date" name="date" required></div>
-          <div><label>Bags damaged</label><input type="number" name="bags" min="1" step="1" required></div>
+          <div><label>Date</label><input type="date" name="date" required=""></div>
+          <div><label>Bags damaged</label><input type="number" name="bags" min="1" step="1" required=""></div>
         </div>
-        <label>Crop affected</label>
-        <select name="crop" id="damagedBagCrop" required></select>
+        <div class="row2">
+          <div>
+            <label>Crop affected</label>
+            <select name="crop" id="damagedBagCrop" required=""><option value="Maize" selected="selected">Maize</option><option value="Soyabeans">Soyabeans</option><option value="Rice">Rice</option></select>
+          </div>
+          <div><label>Manufacturer</label><input type="text" name="manufacturer" id="damagedBagManufacturer" list="damagedBagManufacturerList" placeholder="e.g. Zambags, Manica"></div>
+        </div>
+        <datalist id="damagedBagManufacturerList"></datalist>
         <label>Reason / Note</label>
         <input type="text" name="note" placeholder="e.g. Torn during offloading, rodent damage">
         <button class="btn btn-outline btn-block" type="submit">Record Damaged Bags</button>
       </form>
-      <div id="damagedBagList" style="margin-top:10px;"></div>
+      <div id="damagedBagList" style="margin-top:10px;"><div class="muted" style="margin-bottom:6px;">Total damaged Maize bags: <b>71</b></div><table><thead><tr><th>Date</th><th>Bags</th><th>Note</th><th></th></tr></thead><tbody><tr><td>15 Jul 2026</td><td>71</td><td class="muted">Manifacturer fault</td><td><button class="btn-danger" data-dmg-del="mrlciv9ajq29f">✕</button></td></tr></tbody></table></div>
     </div>
 
     <div class="card">
       <h2>Recent Activity</h2>
-      <div id="grainLedger"></div>
+      <div id="grainLedger"><table><thead><tr><th>Date</th><th>Type</th><th>Bags</th><th>Detail</th><th></th></tr></thead><tbody><tr><td>15 Jul 2026</td><td>Dispatch</td><td>700</td><td class="muted">Mansa Main Depot · Pretom · Dr: Kalasa Kabaso [ASB 1926]</td><td><button class="btn-danger" data-del="Dispatch" data-id="mrlchqfodok0k">✕</button></td></tr><tr><td>15 Jul 2026</td><td>Purchase</td><td>3100</td><td class="muted">@K345.00/bag = K1,069,500.00</td><td><button class="btn-danger" data-del="Purchase" data-id="mrlcfwfhvzxfe">✕</button></td></tr></tbody></table></div>
     </div>
   </div>
 
   <!-- EQUIPMENT -->
   <div class="tabpanel" id="tab-equipment">
     <div class="card">
-      <h2>Equipment on Hand</h2>
-      <div class="item-list" id="equipList"></div>
+      <h2>Equipment and Requisites on Hand</h2>
+      <div class="item-list" id="equipList"><div class="item-row" data-name="Bags"><span class="name">Bags</span><span class="bal">0 <span class="pill low">Low</span></span></div><div class="item-row" data-name="Twine"><span class="name">Twine</span><span class="bal">0 <span class="pill low">Low</span></span></div><div class="item-row" data-name="Sieves"><span class="name">Sieves</span><span class="bal">0 <span class="pill low">Low</span></span></div><div class="item-row" data-name="Tents"><span class="name">Tents</span><span class="bal">0 <span class="pill low">Low</span></span></div><div class="item-row" data-name="Scales"><span class="name">Scales</span><span class="bal">0 <span class="pill low">Low</span></span></div></div>
       <hr class="section-divider">
-      <label>Add new equipment item</label>
-      <div class="row2">
-        <input type="text" id="newEquipName" placeholder="e.g. Tarpaulins">
-        <button class="btn btn-outline" id="addEquipBtn" type="button">Add Item</button>
+      <label>Add new equipment / requisite item</label>
+      <p class="muted" style="margin:2px 0 6px; font-size:12px;">Add a size or type to track variants separately, e.g. Scales + Digital, Tent + 30x30.</p>
+      <div class="row3">
+        <input type="text" id="newEquipName" placeholder="e.g. Scales, Tent">
+        <input type="text" id="newEquipSize" placeholder="Size / Type (optional)">
+        <input type="number" id="newEquipReorder" placeholder="Reorder level" min="0" step="1" value="20">
       </div>
+      <button class="btn btn-outline btn-block" id="addEquipBtn" type="button" style="margin-top:8px;">Add Item</button>
     </div>
 
     <div class="card" id="equipDetailCard" style="display:none;">
       <h2 id="equipDetailTitle">Item</h2>
       <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);" id="equipDetailStats"></div>
+      <div class="row2" style="margin-top:10px;">
+        <div><label>Reorder level (alert below this)</label><input type="number" id="equipReorderInput" min="0" step="1"></div>
+        <div style="display:flex; align-items:flex-end;"><button class="btn btn-outline btn-block" id="saveEquipReorderBtn" type="button">Save Level</button></div>
+      </div>
       <hr class="section-divider">
       <form id="equipTxForm">
         <div class="row2">
           <div>
             <label>Transaction type</label>
             <select name="type">
-              <option value="received">Transfers in</option>
+              <option value="received" selected="selected">Transfers in</option>
               <option value="issued">Issued / used</option>
               <option value="damaged">Damaged / lost</option>
             </select>
           </div>
-          <div><label>Quantity</label><input type="number" name="qty" min="0" step="1" required></div>
+          <div><label>Quantity</label><input type="number" name="qty" min="0" step="1" required=""></div>
         </div>
         <div class="row2">
-          <div><label>Date</label><input type="date" name="date" required></div>
+          <div><label>Date</label><input type="date" name="date" required=""></div>
           <div><label>Note</label><input type="text" name="note" placeholder="optional"></div>
         </div>
         <button class="btn btn-primary btn-block" type="submit">Add Transaction</button>
@@ -461,16 +566,24 @@
 
     <div class="card">
       <h2>Fixed-Salary Staff <span class="sub">SDC &amp; guards, for record</span></h2>
-      <div id="fixedStaffList"></div>
+      <div id="fixedStaffList"><div class="empty">No fixed staff added yet.</div></div>
       <hr class="section-divider">
       <form id="fixedStaffForm">
         <div class="row3">
-          <input type="text" name="name" placeholder="Full name" required>
-          <select name="role" required>
-            <option value="SDC">SDC</option>
+          <input type="text" name="name" placeholder="Full name" required="">
+          <select name="role" required="">
+            <option value="SDC" selected="selected">SDC</option>
             <option value="Guard">Guard</option>
           </select>
           <input type="number" name="salary" placeholder="Salary (K/mo)" min="0" step="0.01">
+        </div>
+        <div class="row2">
+          <input type="text" name="nrc" placeholder="NRC No. (e.g. 123456/78/9)">
+          <input type="text" name="napsa" placeholder="NAPSA No.">
+        </div>
+        <div class="row2">
+          <input type="text" name="bankBranch" placeholder="Bank Name - Branch (e.g. ZANACO - Mansa)">
+          <input type="text" name="accountNumber" placeholder="Account Number">
         </div>
         <button class="btn btn-outline btn-block" type="submit">Add Staff Member</button>
       </form>
@@ -493,21 +606,21 @@
 
     <div class="card">
       <h2>Pay Rates <span class="sub">K per bag, by crop &amp; task category</span></h2>
-      <div id="rateTable"></div>
+      <div id="rateTable"><table><thead><tr><th>Crop</th><th>Loading on stack (K/bag)</th><th>Loading on truck (K/bag)</th><th>Offloading from truck (K/bag)</th><th>Weighing (K/bag)</th><th>Stitching (K/bag)</th></tr></thead><tbody><tr><td>Maize</td><td><input type="number" min="0" step="0.01" data-crop="Maize" data-task="Loading on stack" value="0" style="max-width:80px; padding:5px 6px;"></td><td><input type="number" min="0" step="0.01" data-crop="Maize" data-task="Loading on truck" value="0" style="max-width:80px; padding:5px 6px;"></td><td><input type="number" min="0" step="0.01" data-crop="Maize" data-task="Offloading from truck" value="0" style="max-width:80px; padding:5px 6px;"></td><td><input type="number" min="0" step="0.01" data-crop="Maize" data-task="Weighing" value="0" style="max-width:80px; padding:5px 6px;"></td><td><input type="number" min="0" step="0.01" data-crop="Maize" data-task="Stitching" value="0" style="max-width:80px; padding:5px 6px;"></td></tr><tr><td>Soyabeans</td><td><input type="number" min="0" step="0.01" data-crop="Soyabeans" data-task="Loading on stack" value="0" style="max-width:80px; padding:5px 6px;"></td><td><input type="number" min="0" step="0.01" data-crop="Soyabeans" data-task="Loading on truck" value="0" style="max-width:80px; padding:5px 6px;"></td><td><input type="number" min="0" step="0.01" data-crop="Soyabeans" data-task="Offloading from truck" value="0" style="max-width:80px; padding:5px 6px;"></td><td><input type="number" min="0" step="0.01" data-crop="Soyabeans" data-task="Weighing" value="0" style="max-width:80px; padding:5px 6px;"></td><td><input type="number" min="0" step="0.01" data-crop="Soyabeans" data-task="Stitching" value="0" style="max-width:80px; padding:5px 6px;"></td></tr><tr><td>Rice</td><td><input type="number" min="0" step="0.01" data-crop="Rice" data-task="Loading on stack" value="0" style="max-width:80px; padding:5px 6px;"></td><td><input type="number" min="0" step="0.01" data-crop="Rice" data-task="Loading on truck" value="0" style="max-width:80px; padding:5px 6px;"></td><td><input type="number" min="0" step="0.01" data-crop="Rice" data-task="Offloading from truck" value="0" style="max-width:80px; padding:5px 6px;"></td><td><input type="number" min="0" step="0.01" data-crop="Rice" data-task="Weighing" value="0" style="max-width:80px; padding:5px 6px;"></td><td><input type="number" min="0" step="0.01" data-crop="Rice" data-task="Stitching" value="0" style="max-width:80px; padding:5px 6px;"></td></tr></tbody></table></div>
     </div>
 
     <div class="card">
       <h2>Loaders &amp; Stitchers</h2>
-      <div id="workerList"></div>
+      <div id="workerList"><div class="empty">No workers added yet.</div></div>
       <p class="muted" style="margin-top:6px;">Tap a worker above to edit their details.</p>
       <hr class="section-divider">
       <h3 id="workerFormTitle" style="margin:0 0 8px; font-size:14px;">Add Worker</h3>
       <form id="workerForm">
         <input type="hidden" name="editId" value="">
         <div class="row2">
-          <input type="text" name="name" placeholder="Full name" required>
-          <select name="role" required>
-            <option value="Loader">Loader</option>
+          <input type="text" name="name" placeholder="Full name" required="">
+          <select name="role" required="">
+            <option value="Loader" selected="selected">Loader</option>
             <option value="Stitcher">Stitcher</option>
             <option value="Weigher">Weigher</option>
             <option value="Both">Both (Loader &amp; Stitcher)</option>
@@ -529,23 +642,23 @@
       <h2>Log Daily Work</h2>
       <form id="worklogForm">
         <label>Worker</label>
-        <select name="workerId" id="worklogWorker" required></select>
+        <select name="workerId" id="worklogWorker" required=""></select>
         <div class="row3">
           <div>
-            <label>Date</label><input type="date" name="date" required>
+            <label>Date</label><input type="date" name="date" required="">
           </div>
           <div>
             <label>Crop</label>
-            <select name="crop" id="worklogCrop" required></select>
+            <select name="crop" id="worklogCrop" required=""><option value="Maize" selected="selected">Maize</option><option value="Soyabeans">Soyabeans</option><option value="Rice">Rice</option></select>
           </div>
           <div>
             <label>Task</label>
-            <select name="task" id="worklogTask" required>
-            </select>
+            <select name="task" id="worklogTask" required="">
+            <option value="Loading on stack" selected="selected">Loading on stack</option><option value="Loading on truck">Loading on truck</option><option value="Offloading from truck">Offloading from truck</option><option value="Weighing">Weighing</option><option value="Stitching">Stitching</option></select>
           </div>
         </div>
         <label>Bags handled</label>
-        <input type="number" name="bags" min="0" step="1" required>
+        <input type="number" name="bags" min="0" step="1" required="">
         <button class="btn btn-primary btn-block" type="submit">Add to Log</button>
       </form>
     </div>
@@ -562,19 +675,19 @@
       </div>
       <div>
         <label>Filter by Task <span class="sub">tap to select one or more</span></label>
-        <div id="payrollTaskFilter" style="display:flex; flex-wrap:wrap; gap:6px 12px; margin:6px 0 12px;"></div>
+        <div id="payrollTaskFilter" style="display:flex; flex-wrap:wrap; gap:6px 12px; margin:6px 0 12px;"><label style="display: flex; align-items: center; gap: 5px; font-weight: 400; font-size: 13px; cursor: pointer;"><input type="checkbox" value="Loading on stack" id="payTaskChk0" style="width: auto; margin: 0px;">Loading on stack</label><label style="display: flex; align-items: center; gap: 5px; font-weight: 400; font-size: 13px; cursor: pointer;"><input type="checkbox" value="Loading on truck" id="payTaskChk1" style="width: auto; margin: 0px;">Loading on truck</label><label style="display: flex; align-items: center; gap: 5px; font-weight: 400; font-size: 13px; cursor: pointer;"><input type="checkbox" value="Offloading from truck" id="payTaskChk2" style="width: auto; margin: 0px;">Offloading from truck</label><label style="display: flex; align-items: center; gap: 5px; font-weight: 400; font-size: 13px; cursor: pointer;"><input type="checkbox" value="Weighing" id="payTaskChk3" style="width: auto; margin: 0px;">Weighing</label><label style="display: flex; align-items: center; gap: 5px; font-weight: 400; font-size: 13px; cursor: pointer;"><input type="checkbox" value="Stitching" id="payTaskChk4" style="width: auto; margin: 0px;">Stitching</label></div>
       </div>
       <div class="row2">
         <div>
           <label>Filter by Crop</label>
           <select id="payrollCropFilter">
-            <option value="">All</option>
-          </select>
+            <option value="" selected="selected">All</option>
+          <option value="Maize">Maize</option><option value="Soyabeans">Soyabeans</option><option value="Rice">Rice</option></select>
         </div>
       </div>
       <button class="btn btn-gold btn-block" id="calcPayrollBtn" type="button">Calculate Payroll</button>
     </div>
-    <div class="card" id="payrollResultCard" style="display:none;">
+    <div class="card" id="payrollResultCard" style="display: none;">
       <h2>Payroll Breakdown</h2>
       <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;">
         <button class="btn btn-primary btn-sm" id="markPeriodPaidBtn" type="button" style="margin-top:0;">Mark All as Paid</button>
@@ -585,7 +698,7 @@
     </div>
     <div class="card" id="remotePayCard" style="display:none;">
       <h2>Remote Payment List <span class="sub">Name, NRC, Phone &amp; Amount</span></h2>
-      <textarea class="report" id="remotePayOutput" readonly></textarea>
+      <textarea class="report" id="remotePayOutput" readonly="readonly"></textarea>
       <button class="btn btn-outline" id="copyRemotePayBtn" type="button">Copy Text</button>
       <button class="btn btn-wa" id="waRemotePayBtn" type="button">Share to WhatsApp</button>
     </div>
@@ -603,46 +716,50 @@
     </div>
     <div class="card" id="reportOutputCard" style="display:none;">
       <h2>Report Preview</h2>
-      <textarea class="report" id="reportOutput" readonly></textarea>
+      <textarea class="report" id="reportOutput" readonly="readonly"></textarea>
       <button class="btn btn-outline" id="copyReportBtn" type="button">Copy Text</button>
       <button class="btn btn-wa" id="waReportBtn" type="button">Share to WhatsApp</button>
     </div>
   </div>
 
   <!-- SETTINGS -->
-  <div class="tabpanel" id="tab-settings">
+  <div class="tabpanel active" id="tab-settings">
     <div class="card">
       <h2>Depot Details</h2>
       <form id="settingsForm">
         <label>Depot name</label>
-        <input type="text" name="depotName" placeholder="e.g. Chembe Satellite Depot" required>
+        <input type="text" name="depotName" placeholder="e.g. Chembe Satellite Depot" required="" value="Mutipula">
         <div class="row2">
-          <div><label>District</label><input type="text" name="district" required></div>
-          <div><label>Province</label><input type="text" name="province" value="Luapula" required></div>
+          <div><label>District</label><input type="text" name="district" required="" value="Mwense"></div>
+          <div><label>Province</label><input type="text" name="province" value="Luapula" required=""></div>
         </div>
         <label>Marketing Assistant name</label>
-        <input type="text" name="maName" placeholder="e.g. Mr. Banda">
+        <input type="text" name="maName" placeholder="e.g. Mr. Banda" value="Mr. S.Kumbeni">
         <label>MA WhatsApp number</label>
-        <input type="tel" name="maPhone" placeholder="e.g. +260977123456">
+        <input type="tel" name="maPhone" placeholder="e.g. +260977123456" value="0977638790">
         <label>Delete PIN</label>
-        <input type="text" name="deletePin" placeholder="4-digit PIN to authorise deletions" maxlength="10">
+        <input type="text" name="deletePin" placeholder="4-digit PIN to authorise deletions" maxlength="10" value="1234">
         <p class="muted" style="margin-top:2px;">Default is 1234. Required when deleting any entry.</p>
         <button class="btn btn-primary btn-block" type="submit">Save Details</button>
       </form>
     </div>
     <div class="card">
+      <h2>Bag Weight by Crop <span class="sub">kg per bag, used to calculate tonnage from bags</span></h2>
+      <div id="bagWeightTable"></div>
+    </div>
+    <div class="card">
       <h2>Cloud Sync <span class="sub">share this depot's data across devices</span></h2>
-      <p class="muted" id="cloudSyncStatus">Checking…</p>
-      <div id="cloudSyncLinked" style="display:none;">
+      <p class="muted" id="cloudSyncStatus" style="color: rgb(22, 163, 74);">✓ Synced to cloud</p>
+      <div id="cloudSyncLinked" style="">
         <label>Depot code</label>
         <div class="row2">
-          <input type="text" id="currentDepotCodeDisplay" readonly style="font-weight:700; letter-spacing:.5px;">
+          <input type="text" id="currentDepotCodeDisplay" readonly="readonly" style="font-weight:700; letter-spacing:.5px;" value="001">
           <button class="btn" type="button" id="copyDepotCodeBtn">Copy</button>
         </div>
         <p class="muted" style="margin-top:2px;">Enter this code on another device's Settings to see this same depot's data there.</p>
         <button class="btn" type="button" id="unlinkDepotBtn" style="margin-top:8px;">Unlink this device</button>
       </div>
-      <div id="cloudSyncUnlinked">
+      <div id="cloudSyncUnlinked" style="display: none;">
         <label>Have a depot code from another device?</label>
         <div class="row2">
           <input type="text" id="depotCodeInput" placeholder="e.g. SD-7K3P9Q" style="text-transform:uppercase;">
@@ -654,7 +771,25 @@
     </div>
     <div class="card">
       <h2>My Depots <span class="sub">switch between depots you manage</span></h2>
-      <div id="depotSwitcherList" class="muted">Loading…</div>
+      <div id="depotSwitcherList" class="muted"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);">
+      <div>
+        <div style="font-weight:700;">Mutipula <span style="color:#16a34a;font-size:11px;font-weight:700;">● active</span></div>
+        <div class="muted" style="font-size:11px;letter-spacing:.5px;">001</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        
+        <button class="btn" type="button" data-remove-depot="001" style="color:var(--rust);">Remove</button>
+      </div>
+    </div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);">
+      <div>
+        <div style="font-weight:700;">Chibondo</div>
+        <div class="muted" style="font-size:11px;letter-spacing:.5px;">002</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button class="btn" type="button" data-switch-depot="002">Switch</button>
+        <button class="btn" type="button" data-remove-depot="002" style="color:var(--rust);">Remove</button>
+      </div>
+    </div></div>
       <div style="margin-top:12px;">
         <label>Add another depot to your list</label>
         <input type="text" id="addDepotIndexLabel" placeholder="Label, e.g. Mansa - Main">
@@ -676,9 +811,10 @@
 
       <label>Stock type</label>
       <select id="stockEditType">
-        <option value="">-- Select --</option>
-        <optgroup label="Grain" id="stockEditGrainOpts"></optgroup>
-        <optgroup label="Equipment" id="stockEditEquipOpts"></optgroup>
+        <option value="" selected="selected">-- Select --</option>
+        <optgroup label="Grain" id="stockEditGrainOpts"><option value="grain:Maize">Maize (current: 0 bags)</option><option value="grain:Soyabeans">Soyabeans (current: 0 bags)</option><option value="grain:Rice">Rice (current: 0 bags)</option></optgroup>
+        <optgroup label="Equipment and Requisites" id="stockEditEquipOpts"><option value="equip:Bags">Bags (current: 0)</option><option value="equip:Twine">Twine (current: 0)</option><option value="equip:Sieves">Sieves (current: 0)</option><option value="equip:Tents">Tents (current: 0)</option><option value="equip:Scales">Scales (current: 0)</option></optgroup>
+        <option value="__add_new__">+ Add New Stock Item…</option>
       </select>
 
       <div id="stockEditFields" style="display:none;">
@@ -706,7 +842,7 @@
 
 </div>
 
-<div class="footer-note">Satellite Depot Manager &middot; Nexlite Digital Solutions &middot; works fully offline</div>
+<div class="footer-note">Satellite Depot Manager · Nexlite Digital Solutions · works fully offline</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -740,11 +876,20 @@
 // registration URL below, so the service worker cache name always tracks
 // this single constant — no need to hand-edit a separate CACHE_NAME in
 // sw.js and risk the two drifting out of sync.
-const APP_VER = 'v1.0.0';
+const APP_VER = 'v1.1.0';
 const STORAGE_KEY = 'fraDepotData_v3';
 const CROPS = ['Maize','Soyabeans','Rice'];
 const DEFAULT_EQUIPMENT = ['Bags','Twine','Sieves','Tents','Scales'];
-const TASKS = ['Loading on stack','Loading on truck','Offloading from truck','Weighing','Stitching'];
+const TASKS = ['Loading on stack','Loading on truck','Offloading from truck','Weighing','Stitching','On Purchases'];
+const DEFAULT_REORDER_LEVEL = 20;
+/* Single source of truth for the starting bag weight / pay rate every
+   crop gets (including Maize) before a depot manager customizes them via
+   the Bag Weight and Pay Rates tables. Change the values here rather than
+   editing the individual defaultDB()/normalizeDB()/bagWeightKg() call
+   sites - those all read from these constants now, so no crop (Maize
+   included) has its default hard-coded separately from the others. */
+const DEFAULT_BAG_WEIGHT_KG = 50;
+const DEFAULT_PAY_RATE = 0;
 
 /* ===================== CLOUD SYNC (Firebase RTDB) =====================
    PHASE 1+2 of the multi-depot Firebase integration.
@@ -1308,14 +1453,18 @@ function defaultDB(){
   const grain = {};
   CROPS.forEach(c => grain[c] = { purchases: [], dispatches: [] });
   const equipment = {};
-  DEFAULT_EQUIPMENT.forEach(name => equipment[name] = { transactions: [] });
+  DEFAULT_EQUIPMENT.forEach(name => equipment[name] = { transactions: [], reorderLevel: DEFAULT_REORDER_LEVEL });
   const rates = {};
   CROPS.forEach(c => {
     rates[c] = {};
-    TASKS.forEach(t => rates[c][t] = 0);
+    TASKS.forEach(t => rates[c][t] = DEFAULT_PAY_RATE);
   });
+  /* Bag weight is per-crop (e.g. maize vs soyabean bags often differ),
+     same shape/pattern as the rates map above. */
+  const bagWeightKg = {};
+  CROPS.forEach(c => bagWeightKg[c] = DEFAULT_BAG_WEIGHT_KG);
   return {
-    settings: { depotName:'', district:'', province:'Luapula', maName:'', maPhone:'', deletePin:'1234' },
+    settings: { depotName:'', district:'', province:'Luapula', maName:'', maPhone:'', deletePin:'1234', bagWeightKg },
     grain, equipment, damagedBags: [],
     staff: { fixedStaff: [], workers: [], rates, workLogs: [] }
   };
@@ -1327,7 +1476,8 @@ let DB = load();
 let _memoGrain = {};
 let _memoEquip = {};
 let _memoWages = {};
-function invalidateMemo(){ _memoGrain = {}; _memoEquip = {}; _memoWages = {}; }
+let _wagesIndexed = false; /* true once _memoWages has been built via a single pass over workLogs */
+function invalidateMemo(){ _memoGrain = {}; _memoEquip = {}; _memoWages = {}; _wagesIndexed = false; }
 
 /* ---- PHASE 9 STEP 5 — per-depot local cache ----
    Pure normalization, factored out of load() so the same forward-compat
@@ -1344,8 +1494,32 @@ function normalizeDB(parsed){
     staff: Object.assign(base.staff, parsed.staff||{}, {rates: Object.assign(base.staff.rates, (parsed.staff&&parsed.staff.rates)||{})}),
     settings: Object.assign(base.settings, parsed.settings||{})
   });
-  CROPS.forEach(c=>{ TASKS.forEach(t=>{ if(db.staff.rates[c][t] === undefined) db.staff.rates[c][t] = 0; }); });
+  CROPS.forEach(c=>{ TASKS.forEach(t=>{ if(db.staff.rates[c][t] === undefined) db.staff.rates[c][t] = DEFAULT_PAY_RATE; }); });
+  /* Forward-compat: older depots stored one bagWeightKg number for the
+     whole depot. Migrate that into a per-crop map, seeding every crop
+     with the old value so existing tonnage figures don't silently
+     change; then backfill any crop the map doesn't have yet (e.g. a
+     crop added after this depot's data was first created) with the
+     default bag weight. */
+  if(typeof db.settings.bagWeightKg === 'number'){
+    const legacy = db.settings.bagWeightKg;
+    const map = {};
+    CROPS.forEach(c=> map[c] = legacy);
+    db.settings.bagWeightKg = map;
+  } else if(!db.settings.bagWeightKg || typeof db.settings.bagWeightKg !== 'object'){
+    db.settings.bagWeightKg = {};
+  }
+  CROPS.forEach(c=>{ if(db.settings.bagWeightKg[c] == null) db.settings.bagWeightKg[c] = DEFAULT_BAG_WEIGHT_KG; });
   if(!Array.isArray(db.damagedBags)) db.damagedBags = [];
+  db.damagedBags.forEach(d=>{ if(!d.manufacturer) d.manufacturer = 'Unspecified'; });
+  /* Forward-compat: give any equipment item created before reorder levels
+     existed a sensible default, so the low-stock threshold always has a
+     number to compare against. */
+  Object.keys(db.equipment).forEach(name=>{
+    if(db.equipment[name].reorderLevel === undefined || db.equipment[name].reorderLevel === null){
+      db.equipment[name].reorderLevel = DEFAULT_REORDER_LEVEL;
+    }
+  });
   return db;
 }
 
@@ -1448,6 +1622,24 @@ function escapeHtml(s){
   return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function fmtK(n){ return 'K'+(Math.round((n+Number.EPSILON)*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+/* Grain is tracked in bags everywhere for input simplicity, but depots
+   also need tonnage for FRA-style reporting - derive it from the
+   depot's configured standard bag weight rather than hardcoding 50kg,
+   since bag weight can vary by crop/season. */
+/* Bag weight is per-crop (maize and soyabean bags are often different
+   standard weights) - every call site must say which crop it means.
+   Falls back to the default bag weight if that crop has no entry yet. */
+function bagWeightKg(crop){
+  const map = DB.settings && DB.settings.bagWeightKg;
+  return (map && map[crop] != null) ? map[crop] : DEFAULT_BAG_WEIGHT_KG;
+}
+function tonnesFromBags(bags, crop){ return Math.round((Number(bags)||0) * bagWeightKg(crop) / 1000 * 100) / 100; }
+/* Formats a number that's already in tonnes (e.g. grainBalance()'s
+   purchasedTonnes/dispatchedTonnes/balanceTonnes) - use this instead of
+   fmtTonnes() wherever the tonnage was already computed with the right
+   crop's bag weight, so it isn't silently recomputed a second time. */
+function fmtTonnesValue(tonnes){ return (Number(tonnes)||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) + ' t'; }
+function fmtTonnes(bags, crop){ return fmtTonnesValue(tonnesFromBags(bags, crop)); }
 function fmtDate(d){
   const dt = new Date(d+'T00:00:00');
   return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
@@ -1477,7 +1669,31 @@ document.getElementById('tabs').addEventListener('click', e=>{
   if(!_tabRendered[tab]){ renderTab(tab); _tabRendered[tab] = true; }
   else if(tab === 'dashboard') renderDashboard();
   else if(tab === 'settings') renderSettings();
+  closeDrawer();
 });
+
+/* ===================== HAMBURGER DRAWER ===================== */
+const drawerEl = document.getElementById('tabs');
+const overlayEl = document.getElementById('drawerOverlay');
+const hamburgerBtn = document.getElementById('hamburgerBtn');
+const drawerCloseBtn = document.getElementById('drawerCloseBtn');
+
+function openDrawer(){
+  drawerEl.classList.add('open');
+  overlayEl.classList.add('open');
+  hamburgerBtn.setAttribute('aria-expanded','true');
+}
+function closeDrawer(){
+  drawerEl.classList.remove('open');
+  overlayEl.classList.remove('open');
+  hamburgerBtn.setAttribute('aria-expanded','false');
+}
+hamburgerBtn.addEventListener('click', ()=>{
+  drawerEl.classList.contains('open') ? closeDrawer() : openDrawer();
+});
+drawerCloseBtn.addEventListener('click', closeDrawer);
+overlayEl.addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape') closeDrawer(); });
 
 function renderTab(tab){
   switch(tab){
@@ -1500,7 +1716,13 @@ function grainBalance(crop){
   let purchased = 0, dispatched = 0;
   for(let i = 0; i < g.purchases.length; i++)  purchased  += Number(g.purchases[i].bags);
   for(let i = 0; i < g.dispatches.length; i++) dispatched += Number(g.dispatches[i].bags);
-  const result = { purchased, dispatched, balance: purchased - dispatched };
+  const balance = purchased - dispatched;
+  const result = {
+    purchased, dispatched, balance,
+    purchasedTonnes: tonnesFromBags(purchased, crop),
+    dispatchedTonnes: tonnesFromBags(dispatched, crop),
+    balanceTonnes: tonnesFromBags(balance, crop)
+  };
   _memoGrain[crop] = result;
   return result;
 }
@@ -1521,11 +1743,12 @@ function renderCropSelect(){
 function renderGrainTab(){
   renderCropSelect();
   const bal = grainBalance(activeCrop);
-  document.getElementById('grainBalanceHeading').innerHTML = activeCrop + ' <span class="sub">bags</span>';
+  document.getElementById('grainBalanceHeading').innerHTML = activeCrop + ' <span class="sub">bags &amp; tonnage</span>';
   document.getElementById('grainBalanceStats').innerHTML =
-    '<div class="stat"><div class="num">'+bal.purchased+'</div><div class="lbl">Purchased</div></div>'+
-    '<div class="stat"><div class="num">'+bal.dispatched+'</div><div class="lbl">Dispatched</div></div>'+
-    '<div class="stat"><div class="num">'+bal.balance+'</div><div class="lbl">Balance</div></div>';
+    '<div class="stat"><div class="num">'+bal.purchased+'</div><div class="lbl">Purchased (bags)</div></div>'+
+    '<div class="stat"><div class="num">'+fmtTonnesValue(bal.purchasedTonnes)+'</div><div class="lbl">Purchased (tonnes)</div></div>'+
+    '<div class="stat"><div class="num">'+bal.dispatched+'</div><div class="lbl">Dispatched (bags)</div></div>'+
+    '<div class="stat"><div class="num">'+bal.balance+'</div><div class="lbl">Balance (bags)</div></div>';
 
   const g = DB.grain[activeCrop];
   const items = [];
@@ -1604,14 +1827,61 @@ document.getElementById('cropSelect').addEventListener('click', e=>{
   renderGrainTab();
 });
 
+/* Purchase quantity: accepts either bags or tonnes, always stored as bags
+   internally (everything else in the app — balances, dispatches, reports —
+   is bag-denominated), with a live preview of the other unit as you type. */
+function updatePurchaseQtyPreview(){
+  const qtyEl = document.getElementById('purchaseQty');
+  const unitEl = document.getElementById('purchaseQtyUnit');
+  const previewEl = document.getElementById('purchaseQtyConverted');
+  const qty = Number(qtyEl.value);
+  if(!qty || qty <= 0){ previewEl.textContent = ''; return; }
+  if(unitEl.value === 'tonnes'){
+    const bags = Math.round(qty * 1000 / bagWeightKg(activeCrop));
+    previewEl.textContent = '= ' + bags.toLocaleString() + ' bags (at ' + bagWeightKg(activeCrop) + 'kg/bag)';
+  } else {
+    previewEl.textContent = '= ' + fmtTonnes(qty, activeCrop);
+  }
+}
+/* Tracks which unit the quantity field currently represents, so
+   toggling the dropdown can convert the number rather than just
+   relabeling it - without this, switching bags -> tonnes (or back)
+   silently changed the real quantity (e.g. "50" meant 50 bags, then
+   after switching the dropdown it meant 50 tonnes instead of the
+   ~2.5t that 50 bags actually is). */
+let _purchaseQtyUnit = 'bags';
+document.getElementById('purchaseQty').addEventListener('input', updatePurchaseQtyPreview);
+document.getElementById('purchaseQtyUnit').addEventListener('change', ()=>{
+  const qtyEl = document.getElementById('purchaseQty');
+  const unitEl = document.getElementById('purchaseQtyUnit');
+  const newUnit = unitEl.value;
+  const qty = Number(qtyEl.value);
+  if(qty > 0 && newUnit !== _purchaseQtyUnit){
+    qtyEl.value = newUnit === 'tonnes'
+      ? tonnesFromBags(qty, activeCrop)                       /* bags -> tonnes */
+      : Math.round(qty * 1000 / bagWeightKg(activeCrop));     /* tonnes -> bags */
+  }
+  _purchaseQtyUnit = newUnit;
+  qtyEl.step = newUnit === 'tonnes' ? '0.01' : '1';
+  updatePurchaseQtyPreview();
+});
+
 document.getElementById('purchaseForm').addEventListener('submit', e=>{
   e.preventDefault();
   const f = new FormData(e.target);
+  const qty = Number(document.getElementById('purchaseQty').value) || 0;
+  const unit = document.getElementById('purchaseQtyUnit').value;
+  const bags = unit === 'tonnes' ? Math.round(qty * 1000 / bagWeightKg(activeCrop)) : Math.round(qty);
+  if(bags <= 0){ toast('Enter a valid quantity'); return; }
   DB.grain[activeCrop].purchases.push({
-    id: uid(), date: f.get('date'), bags: Number(f.get('bags')), price: Number(f.get('price'))
+    id: uid(), date: f.get('date'), bags: bags, price: Number(f.get('price'))
   });
   save(); e.target.reset(); e.target.date.value = todayStr();
-  renderGrainTab(); toast('Purchase recorded');
+  document.getElementById('purchaseQtyUnit').value = 'bags';
+  _purchaseQtyUnit = 'bags';
+  document.getElementById('purchaseQty').step = '1';
+  document.getElementById('purchaseQtyConverted').textContent = '';
+  renderGrainTab(); toast('Purchase recorded: ' + bags + ' bags (' + fmtTonnes(bags, activeCrop) + ')');
 });
 
 document.getElementById('dispatchForm').addEventListener('submit', e=>{
@@ -1652,6 +1922,7 @@ document.getElementById('damagedBagForm').addEventListener('submit', e=>{
     date: f.get('date'),
     crop: f.get('crop'),
     bags: Number(f.get('bags')),
+    manufacturer: (f.get('manufacturer')||'').trim() || 'Unspecified',
     note: (f.get('note')||'').trim()
   });
   save(); e.target.reset(); e.target.date.value = todayStr();
@@ -1662,21 +1933,47 @@ function renderDamagedBags(){
   const container = document.getElementById('damagedBagList');
   /* Filter to active crop */
   const items = DB.damagedBags.filter(d => d.crop === activeCrop);
+
+  /* Keep the manufacturer datalist fresh across all crops, so previously
+     used names auto-suggest without retyping them. */
+  const dl = document.getElementById('damagedBagManufacturerList');
+  const seen = new Set();
+  let dlHtml = '';
+  DB.damagedBags.forEach(d=>{
+    const m = d.manufacturer || 'Unspecified';
+    if(!seen.has(m)){ seen.add(m); dlHtml += '<option value="'+escapeHtml(m)+'"></option>'; }
+  });
+  dl.innerHTML = dlHtml;
+
   if(items.length === 0){
     container.innerHTML = '<div class="empty">No damaged bags recorded for '+activeCrop+'.</div>';
     return;
   }
-  /* Summary */
+  /* Segment by manufacturer */
+  const byMfr = {};
+  const mfrOrder = [];
   let total = 0;
-  for(let i = 0; i < items.length; i++) total += items[i].bags;
-  let html = '<div class="muted" style="margin-bottom:6px;">Total damaged '+activeCrop+' bags: <b>'+total+'</b></div>';
-  html += '<table><thead><tr><th>Date</th><th>Bags</th><th>Note</th><th></th></tr></thead><tbody>';
-  const sorted = items.slice().sort((a,b)=> b.date.localeCompare(a.date));
-  sorted.forEach(d=>{
-    html += '<tr><td>'+fmtDate(d.date)+'</td><td>'+d.bags+'</td><td class="muted">'+(d.note||'')+'</td>';
-    html += '<td><button class="btn-danger" data-dmg-del="'+d.id+'">\u2715</button></td></tr>';
+  items.forEach(d=>{
+    const m = d.manufacturer || 'Unspecified';
+    if(!byMfr[m]){ byMfr[m] = { bags: 0, entries: [] }; mfrOrder.push(m); }
+    byMfr[m].bags += d.bags;
+    byMfr[m].entries.push(d);
+    total += d.bags;
   });
-  html += '</tbody></table>';
+  mfrOrder.sort((a,b)=> byMfr[b].bags - byMfr[a].bags);
+
+  let html = '<div class="muted" style="margin-bottom:6px;">Total damaged '+activeCrop+' bags: <b>'+total+'</b></div>';
+  mfrOrder.forEach(m=>{
+    const rec = byMfr[m];
+    html += '<div style="margin-top:10px; font-weight:700; font-size:13px;">'+escapeHtml(m)+' <span class="muted" style="font-weight:400;">('+rec.bags+' bags)</span></div>';
+    html += '<table style="margin-top:4px;"><thead><tr><th>Date</th><th>Bags</th><th>Note</th><th></th></tr></thead><tbody>';
+    const sorted = rec.entries.slice().sort((a,b)=> b.date.localeCompare(a.date));
+    sorted.forEach(d=>{
+      html += '<tr><td>'+fmtDate(d.date)+'</td><td>'+d.bags+'</td><td class="muted">'+(d.note||'')+'</td>';
+      html += '<td><button class="btn-danger" data-dmg-del="'+d.id+'">\u2715</button></td></tr>';
+    });
+    html += '</tbody></table>';
+  });
   container.innerHTML = html;
 }
 
@@ -1714,7 +2011,8 @@ function renderEquipmentTab(){
   names.forEach(name=>{
     hasItems = true;
     const bal = equipBalance(name);
-    const low = bal < 20;
+    const reorderLevel = (DB.equipment[name].reorderLevel != null) ? DB.equipment[name].reorderLevel : DEFAULT_REORDER_LEVEL;
+    const low = bal <= reorderLevel;
     const row = document.createElement('div');
     row.className = 'item-row'; row.dataset.name = name;
     const nameSpan = document.createElement('span'); nameSpan.className = 'name'; nameSpan.textContent = name;
@@ -1748,6 +2046,7 @@ function renderEquipDetail(){
     else damaged += Number(t.qty);
   }
   document.getElementById('equipDetailTitle').textContent = activeEquip;
+  document.getElementById('equipReorderInput').value = (DB.equipment[activeEquip].reorderLevel != null) ? DB.equipment[activeEquip].reorderLevel : DEFAULT_REORDER_LEVEL;
   document.getElementById('equipDetailStats').innerHTML =
     '<div class="stat"><div class="num">'+received+'</div><div class="lbl">Transfers In</div></div>'+
     '<div class="stat"><div class="num">'+issued+'</div><div class="lbl">Issued</div></div>'+
@@ -1784,13 +2083,30 @@ document.getElementById('equipLedger').addEventListener('click', e=>{
   });
 });
 
+document.getElementById('saveEquipReorderBtn').addEventListener('click', ()=>{
+  if(!activeEquip || !DB.equipment[activeEquip]) return;
+  const val = Number(document.getElementById('equipReorderInput').value);
+  if(isNaN(val) || val < 0){ toast('Enter a valid reorder level'); return; }
+  DB.equipment[activeEquip].reorderLevel = val;
+  save(); renderEquipmentTab(); renderDashboard(); toast('Reorder level saved');
+});
+
 document.getElementById('addEquipBtn').addEventListener('click', ()=>{
   const input = document.getElementById('newEquipName');
-  const name = input.value.trim();
-  if(!name) return;
+  const sizeInput = document.getElementById('newEquipSize');
+  const reorderInput = document.getElementById('newEquipReorder');
+  const baseName = input.value.trim();
+  const size = sizeInput.value.trim();
+  if(!baseName) return;
+  const name = size ? (baseName + ' - ' + size) : baseName;
   if(DB.equipment[name]){ toast('Item already exists'); return; }
-  DB.equipment[name] = { transactions: [] };
-  save(); input.value=''; renderEquipmentTab(); toast('Item added');
+  const reorderLevel = Number(reorderInput.value);
+  DB.equipment[name] = {
+    transactions: [],
+    reorderLevel: (isNaN(reorderLevel) || reorderLevel < 0) ? DEFAULT_REORDER_LEVEL : reorderLevel,
+    baseType: baseName, size: size
+  };
+  save(); input.value=''; sizeInput.value=''; reorderInput.value = '20'; renderEquipmentTab(); toast('Item added');
 });
 
 document.getElementById('equipTxForm').addEventListener('submit', e=>{
@@ -1822,6 +2138,19 @@ function renderFixedStaff(){
     const nameEl = document.createElement('div'); nameEl.className = 'name'; nameEl.textContent = s.name;
     const roleEl = document.createElement('div'); roleEl.className = 'role'; roleEl.textContent = s.role;
     left.appendChild(nameEl); left.appendChild(roleEl);
+    if(s.nrc || s.napsa){
+      const metaEl = document.createElement('div'); metaEl.className = 'meta';
+      const parts = [];
+      if(s.nrc) parts.push('NRC: ' + s.nrc);
+      if(s.napsa) parts.push('NAPSA: ' + s.napsa);
+      metaEl.textContent = parts.join(' \u00B7 ');
+      left.appendChild(metaEl);
+    }
+    if(s.bankBranch || s.accountNumber){
+      const bankEl = document.createElement('div'); bankEl.className = 'meta';
+      bankEl.textContent = (s.bankBranch || '') + (s.accountNumber ? ' — Acc: ' + s.accountNumber : '');
+      left.appendChild(bankEl);
+    }
     const right = document.createElement('div'); right.style.textAlign = 'right';
     const salEl = document.createElement('div'); salEl.className = 'muted'; salEl.textContent = s.salary ? fmtK(s.salary)+'/mo' : '';
     const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:6px; margin-top:4px; justify-content:flex-end;';
@@ -1852,7 +2181,11 @@ document.getElementById('fixedStaffList').addEventListener('click', e=>{
 document.getElementById('fixedStaffForm').addEventListener('submit', e=>{
   e.preventDefault();
   const f = new FormData(e.target);
-  DB.staff.fixedStaff.push({ id: uid(), name: f.get('name'), role: f.get('role'), salary: Number(f.get('salary'))||0 });
+  DB.staff.fixedStaff.push({
+    id: uid(), name: f.get('name'), role: f.get('role'), salary: Number(f.get('salary'))||0,
+    nrc: (f.get('nrc')||'').trim(), napsa: (f.get('napsa')||'').trim(),
+    bankBranch: (f.get('bankBranch')||'').trim(), accountNumber: (f.get('accountNumber')||'').trim()
+  });
   save(); e.target.reset(); renderFixedStaff(); toast('Staff added');
 });
 
@@ -2017,16 +2350,36 @@ document.getElementById('rateTable').addEventListener('change', e=>{
   save(); renderWorkerList();
 });
 
-function workerWageOwed(workerId){
-  if(_memoWages[workerId] !== undefined) return _memoWages[workerId];
-  let total = 0;
+/* Single-pass index: builds { workerId: totalOwed } once by scanning
+   workLogs a single time, instead of re-scanning the full workLogs array
+   once per worker (which was O(workers * workLogs) on every render right
+   after an edit). Rebuilt lazily on first call after invalidateMemo(),
+   then every workerWageOwed() call is an O(1) lookup against it. */
+function buildWagesIndex(){
+  _memoWages = {};
   const logs = DB.staff.workLogs;
   for(let i = 0; i < logs.length; i++){
     const w = logs[i];
-    if(w.workerId === workerId && !w.paid) total += w.wage;
+    if(w.paid) continue;
+    _memoWages[w.workerId] = (_memoWages[w.workerId] || 0) + w.wage;
   }
-  _memoWages[workerId] = total;
-  return total;
+  _wagesIndexed = true;
+}
+function workerWageOwed(workerId){
+  if(!_wagesIndexed) buildWagesIndex();
+  return _memoWages[workerId] || 0;
+}
+
+/* Builds a Map of workerId -> worker in a single O(workers) pass, so
+   report/payroll loops that need to look up several workers by id can
+   do so in O(1) each instead of re-running Array.find() (O(workers))
+   once per lookup - that combination was O(workers * matchedWorkers)
+   across the payroll/report/WhatsApp-share loops below. */
+function workersById(){
+  const map = new Map();
+  const workers = DB.staff.workers;
+  for(let i = 0; i < workers.length; i++) map.set(workers[i].id, workers[i]);
+  return map;
 }
 
 function renderWorkerList(){
@@ -2155,6 +2508,7 @@ document.getElementById('workerForm').addEventListener('submit', e=>{
 /* Worklog crop & task options */
 (function(){
   const cropSel = document.getElementById('worklogCrop');
+  cropSel.textContent = '';
   const cropFrag = document.createDocumentFragment();
   CROPS.forEach(c=>{
     const opt = document.createElement('option'); opt.value = c; opt.textContent = c;
@@ -2163,6 +2517,7 @@ document.getElementById('workerForm').addEventListener('submit', e=>{
   cropSel.appendChild(cropFrag);
 
   const taskSel = document.getElementById('worklogTask');
+  taskSel.textContent = '';
   const taskFrag = document.createDocumentFragment();
   TASKS.forEach(t=>{
     const opt = document.createElement('option'); opt.value = t; opt.textContent = t;
@@ -2172,6 +2527,7 @@ document.getElementById('workerForm').addEventListener('submit', e=>{
 
   /* Payroll task filter — checkboxes, allows selecting more than one task */
   const payTaskWrap = document.getElementById('payrollTaskFilter');
+  payTaskWrap.textContent = '';
   const payTaskFrag = document.createDocumentFragment();
   TASKS.forEach((t, idx)=>{
     const id = 'payTaskChk' + idx;
@@ -2210,6 +2566,20 @@ document.getElementById('worklogForm').addEventListener('submit', e=>{
 });
 
 /* ===================== PAYROLL CALCULATOR ===================== */
+/* Pro-rates a fixed monthly salary over an arbitrary period range (e.g.
+   17-25 June), using a standard 30-day month as the divisor - this keeps
+   the math simple and predictable for partial-period runs, matching how
+   the rest of this app already treats "days in period" style ranges. */
+function daysInRange(from, to){
+  const a = new Date(from + 'T00:00:00'), b = new Date(to + 'T00:00:00');
+  return Math.round((b - a) / 86400000) + 1;
+}
+function fixedStaffPayForPeriod(staff, from, to){
+  const days = daysInRange(from, to);
+  const dailyRate = (staff.salary || 0) / 30;
+  return Math.round(dailyRate * days * 100) / 100;
+}
+
 let _payrollCache = null; /* cache the last computed payroll for "mark paid" & "share" */
 
 function renderPayrollCropFilter(){
@@ -2231,7 +2601,7 @@ document.getElementById('calcPayrollBtn').addEventListener('click', ()=>{
   const roleFilters = getPayrollTaskFilter(); /* array of selected tasks, [] = All */
   const cropFilter = document.getElementById('payrollCropFilter').value;
 
-  /* Gather matching work logs */
+  /* Gather matching work logs (loaders / stitchers / weighers / "On Purchases") */
   const logs = [];
   for(let i = 0; i < DB.staff.workLogs.length; i++){
     const w = DB.staff.workLogs[i];
@@ -2241,17 +2611,22 @@ document.getElementById('calcPayrollBtn').addEventListener('click', ()=>{
     logs.push(w);
   }
 
+  /* Fixed staff (SDC & Guards), pro-rated for the chosen period range */
+  const fixedStaffPay = DB.staff.fixedStaff.map(st=>({
+    staff: st, amount: fixedStaffPayForPeriod(st, from, to)
+  }));
+
   const container = document.getElementById('payrollResult');
   const card = document.getElementById('payrollResultCard');
   card.style.display = 'block';
 
-  if(logs.length === 0){
-    container.innerHTML = '<div class="empty">No work logged in this period for the selected filters.</div>';
+  if(logs.length === 0 && fixedStaffPay.length === 0){
+    container.innerHTML = '<div class="empty">No work logged and no fixed staff on record for this period.</div>';
     _payrollCache = null;
     return;
   }
 
-  /* Group by worker */
+  /* Group hourly/per-bag work by worker */
   const byWorker = {};
   const matchingWorkerIds = [];
   for(let i = 0; i < logs.length; i++){
@@ -2267,20 +2642,42 @@ document.getElementById('calcPayrollBtn').addEventListener('click', ()=>{
 
   let html = '';
   let grandTotal = 0;
+  let fixedStaffTotal = 0;
 
+  if(fixedStaffPay.length > 0){
+    html += '<h3 style="margin:0 0 8px; font-size:14px;">Fixed Staff (SDCs &amp; Guards) — Period: ' + fmtDate(from) + ' to ' + fmtDate(to) + '</h3>';
+    fixedStaffPay.forEach(rec=>{
+      const st = rec.staff;
+      fixedStaffTotal += rec.amount;
+      html += '<div class="worker-card"><div class="top"><div>';
+      html += '<div class="name">' + escapeHtml(st.name) + '</div><div class="role">' + escapeHtml(st.role) + '</div>';
+      if(st.nrc) html += '<div class="meta">NRC: ' + escapeHtml(st.nrc) + '</div>';
+      if(st.napsa) html += '<div class="meta">NAPSA: ' + escapeHtml(st.napsa) + '</div>';
+      if(st.bankBranch || st.accountNumber) html += '<div class="meta">' + escapeHtml(st.bankBranch||'') + (st.accountNumber ? ' — Acc: ' + escapeHtml(st.accountNumber) : '') + '</div>';
+      html += '</div><div style="text-align:right;"><div class="owed">' + fmtK(rec.amount) + '</div>';
+      html += '<div class="muted">' + fmtK(st.salary||0) + '/mo, pro-rated</div></div></div></div>';
+    });
+    grandTotal += fixedStaffTotal;
+  }
+
+  if(matchingWorkerIds.length > 0){
+    html += '<h3 style="margin:16px 0 8px; font-size:14px;">Loaders / Stitchers / Weighers / On Purchases</h3>';
+  }
+
+  const workersMap = workersById();
   for(let j = 0; j < matchingWorkerIds.length; j++){
     const wid = matchingWorkerIds[j];
-    const worker = DB.staff.workers.find(w=>w.id === wid);
+    const worker = workersMap.get(wid);
     const rec = byWorker[wid];
     grandTotal += rec.totalWage;
 
     html += '<div class="worker-card">';
     html += '<div class="top"><div>';
-    html += '<div class="name">' + (worker ? worker.name : 'Unknown') + '</div>';
-    html += '<div class="role">' + (worker ? worker.role : '') + '</div>';
-    if(worker && worker.nrc) html += '<div class="meta">NRC: ' + worker.nrc + '</div>';
-    if(worker && worker.category) html += '<div class="meta">Category: ' + worker.category + '</div>';
-    if(worker && worker.phone) html += '<div class="meta">Phone: ' + worker.phone + '</div>';
+    html += '<div class="name">' + (worker ? escapeHtml(worker.name) : 'Unknown') + '</div>';
+    html += '<div class="role">' + (worker ? escapeHtml(worker.role) : '') + '</div>';
+    if(worker && worker.nrc) html += '<div class="meta">NRC: ' + escapeHtml(worker.nrc) + '</div>';
+    if(worker && worker.category) html += '<div class="meta">Category: ' + escapeHtml(worker.category) + '</div>';
+    if(worker && worker.phone) html += '<div class="meta">Phone: ' + escapeHtml(worker.phone) + '</div>';
     html += '</div>';
     html += '<div style="text-align:right;"><div class="owed">' + fmtK(rec.totalWage) + '</div>';
     html += '<div class="muted">' + rec.totalBags + ' bags total</div></div></div>';
@@ -2298,7 +2695,7 @@ document.getElementById('calcPayrollBtn').addEventListener('click', ()=>{
   html += '<div class="payroll-total"><span class="label">GRAND TOTAL</span><span class="amount">' + fmtK(grandTotal) + '</span></div>';
 
   container.innerHTML = html;
-  _payrollCache = { from, to, roleFilters, cropFilter, logs, grandTotal };
+  _payrollCache = { from, to, roleFilters, cropFilter, logs, fixedStaffPay, fixedStaffTotal, grandTotal };
 });
 
 /* Mark all in period as paid */
@@ -2336,6 +2733,20 @@ document.getElementById('sharePayrollBtn').addEventListener('click', ()=>{
   if(cropFilter) lines.push('Crop: ' + cropFilter);
   lines.push('');
 
+  if(_payrollCache.fixedStaffPay && _payrollCache.fixedStaffPay.length > 0){
+    lines.push('*FIXED STAFF (SDCs & GUARDS) — pro-rated*');
+    _payrollCache.fixedStaffPay.forEach(rec=>{
+      const st = rec.staff;
+      let name = st.name + ' (' + st.role + ')';
+      if(st.nrc) name += ' | NRC: ' + st.nrc;
+      if(st.napsa) name += ' | NAPSA: ' + st.napsa;
+      if(st.bankBranch || st.accountNumber) name += ' | ' + (st.bankBranch||'') + (st.accountNumber ? ' Acc: ' + st.accountNumber : '');
+      lines.push(name + ': ' + fmtK(rec.amount));
+    });
+    lines.push('Fixed staff subtotal: ' + fmtK(_payrollCache.fixedStaffTotal||0));
+    lines.push('');
+  }
+
   /* Group by worker */
   const byWorker = {};
   const ids = [];
@@ -2345,8 +2756,10 @@ document.getElementById('sharePayrollBtn').addEventListener('click', ()=>{
     byWorker[w.workerId].bags += w.bags;
     byWorker[w.workerId].wage += w.wage;
   }
+  if(ids.length > 0) lines.push('*LOADERS / STITCHERS / WEIGHERS / ON PURCHASES*');
+  const shareWorkersMap = workersById();
   for(let j = 0; j < ids.length; j++){
-    const worker = DB.staff.workers.find(w=>w.id === ids[j]);
+    const worker = shareWorkersMap.get(ids[j]);
     const rec = byWorker[ids[j]];
     let name = worker ? worker.name : 'Unknown';
     if(worker && worker.nrc) name += ' (NRC: ' + worker.nrc + ')';
@@ -2365,7 +2778,7 @@ document.getElementById('sharePayrollBtn').addEventListener('click', ()=>{
 
 /* Remote Payment List — Name, NRC, Phone, Amount only, for paying workers via mobile money */
 document.getElementById('genRemotePayBtn').addEventListener('click', ()=>{
-  if(!_payrollCache || !_payrollCache.logs || _payrollCache.logs.length === 0){
+  if(!_payrollCache || ((!_payrollCache.logs || _payrollCache.logs.length === 0) && (!_payrollCache.fixedStaffPay || _payrollCache.fixedStaffPay.length === 0))){
     toast('Calculate payroll first'); return;
   }
   const s = DB.settings;
@@ -2374,6 +2787,22 @@ document.getElementById('genRemotePayBtn').addEventListener('click', ()=>{
   lines.push((s.depotName || 'Depot') + ' \u2014 ' + (s.district||'') + ', ' + (s.province||''));
   lines.push('Period: ' + fmtDate(_payrollCache.from) + ' to ' + fmtDate(_payrollCache.to));
   lines.push('');
+
+  let grandTotal = 0;
+  let missingPhone = 0;
+  let rowNum = 0;
+
+  if(_payrollCache.fixedStaffPay && _payrollCache.fixedStaffPay.length > 0){
+    lines.push('*Fixed Staff (SDCs & Guards)*');
+    _payrollCache.fixedStaffPay.forEach(rec=>{
+      const st = rec.staff;
+      grandTotal += rec.amount;
+      rowNum++;
+      const bank = (st.bankBranch || '-') + (st.accountNumber ? ' Acc: ' + st.accountNumber : '');
+      lines.push(rowNum + '. ' + st.name + ' (' + st.role + ') | NRC: ' + (st.nrc||'-') + ' | ' + bank + ' | ' + fmtK(rec.amount));
+    });
+    lines.push('');
+  }
 
   /* Group by worker */
   const byWorker = {};
@@ -2384,17 +2813,18 @@ document.getElementById('genRemotePayBtn').addEventListener('click', ()=>{
     byWorker[w.workerId].wage += w.wage;
   }
 
-  let grandTotal = 0;
-  let missingPhone = 0;
+  if(ids.length > 0) lines.push('*Loaders / Stitchers / Weighers / On Purchases*');
+  const remotePayWorkersMap = workersById();
   for(let j = 0; j < ids.length; j++){
-    const worker = DB.staff.workers.find(w=>w.id === ids[j]);
+    const worker = remotePayWorkersMap.get(ids[j]);
     const rec = byWorker[ids[j]];
     grandTotal += rec.wage;
+    rowNum++;
     const name = worker ? worker.name : 'Unknown';
     const nrc = (worker && worker.nrc) ? worker.nrc : '-';
     const phone = (worker && worker.phone) ? worker.phone : '-';
     if(!worker || !worker.phone) missingPhone++;
-    lines.push((j+1) + '. ' + name + ' | NRC: ' + nrc + ' | Phone: ' + phone + ' | ' + fmtK(rec.wage));
+    lines.push(rowNum + '. ' + name + ' | NRC: ' + nrc + ' | Phone: ' + phone + ' | ' + fmtK(rec.wage));
   }
   lines.push('');
   lines.push('*Total to pay: ' + fmtK(grandTotal) + '*');
@@ -2423,14 +2853,15 @@ document.getElementById('waRemotePayBtn').addEventListener('click', ()=>{
 function renderDashboard(){
   const statsHtml = CROPS.map(c=>{
     const b = grainBalance(c);
-    return '<div class="stat"><div class="num">'+b.balance+'</div><div class="lbl">'+c+'</div></div>';
+    return '<div class="stat"><div class="num">'+b.purchased+'</div><div class="lbl">'+c+' purchased (bags)</div></div>'+
+           '<div class="stat"><div class="num">'+fmtTonnesValue(b.purchasedTonnes)+'</div><div class="lbl">'+c+' purchased (t)</div></div>';
   }).join('');
   document.getElementById('dashStats').innerHTML = statsHtml;
 
   let grainRows = '';
   CROPS.forEach(c=>{
     const b = grainBalance(c);
-    grainRows += '<tr><td>'+c+'</td><td>'+b.purchased+'</td><td>'+b.dispatched+'</td><td><b>'+b.balance+'</b></td></tr>';
+    grainRows += '<tr><td>'+c+'</td><td>'+b.purchased+' <span class="muted">('+fmtTonnesValue(b.purchasedTonnes)+')</span></td><td>'+b.dispatched+'</td><td><b>'+b.balance+'</b></td></tr>';
   });
   document.getElementById('dashGrain').innerHTML =
     '<table><thead><tr><th>Crop</th><th>Purchased</th><th>Dispatched</th><th>Balance</th></tr></thead><tbody>'+grainRows+'</tbody></table>';
@@ -2439,7 +2870,8 @@ function renderDashboard(){
   const equipNames = Object.keys(DB.equipment);
   for(let i = 0; i < equipNames.length; i++){
     const n = equipNames[i]; const bal = equipBalance(n);
-    if(bal < 20) lowItems.push({name:n, bal});
+    const reorderLevel = (DB.equipment[n].reorderLevel != null) ? DB.equipment[n].reorderLevel : DEFAULT_REORDER_LEVEL;
+    if(bal <= reorderLevel) lowItems.push({name:n, bal});
   }
   document.getElementById('dashEquip').innerHTML = lowItems.length ?
     lowItems.map(x=>'<div style="margin-bottom:6px;">'+x.name+': <span class="pill low">'+x.bal+' left</span></div>').join('') :
@@ -2472,19 +2904,20 @@ document.getElementById('genReportBtn').addEventListener('click', ()=>{
   lines.push('*GRAIN STOCK (to-date)*');
   CROPS.forEach(c=>{
     const b = grainBalance(c);
-    lines.push(c + ': Purchased ' + b.purchased + ' bags, Dispatched ' + b.dispatched + ' bags, Balance ' + b.balance + ' bags');
+    lines.push(c + ': Purchased ' + b.purchased + ' bags (' + fmtTonnesValue(b.purchasedTonnes) + '), Dispatched ' + b.dispatched + ' bags (' + fmtTonnesValue(b.dispatchedTonnes) + '), Balance ' + b.balance + ' bags (' + fmtTonnesValue(b.balanceTonnes) + ')');
   });
   lines.push('');
 
-  /* ── EQUIPMENT STATUS ── */
-  lines.push('*EQUIPMENT STATUS*');
+  /* ── EQUIPMENT AND REQUISITES STATUS ── */
+  lines.push('*EQUIPMENT AND REQUISITES STATUS*');
   const equipNames = Object.keys(DB.equipment);
   if(equipNames.length === 0){
-    lines.push('No equipment recorded.');
+    lines.push('No equipment and requisites recorded.');
   } else {
     equipNames.forEach(name=>{
       const bal = equipBalance(name);
-      lines.push(name + ': ' + bal + (bal < 20 ? ' (LOW)' : ''));
+      const reorderLevel = (DB.equipment[name].reorderLevel != null) ? DB.equipment[name].reorderLevel : DEFAULT_REORDER_LEVEL;
+      lines.push(name + ': ' + bal + (bal <= reorderLevel ? ' (LOW - reorder level ' + reorderLevel + ')' : ''));
     });
   }
   lines.push('');
@@ -2495,18 +2928,38 @@ document.getElementById('genReportBtn').addEventListener('click', ()=>{
   if(dmgInPeriod.length === 0){
     lines.push('No damaged bags recorded in this period.');
   } else {
-    const dmgByCrop = {};
+    const dmgByCropMfr = {};
+    let dmgTotal = 0;
     for(let i = 0; i < dmgInPeriod.length; i++){
       const d = dmgInPeriod[i];
-      if(!dmgByCrop[d.crop]) dmgByCrop[d.crop] = 0;
-      dmgByCrop[d.crop] += d.bags;
+      const mfr = d.manufacturer || 'Unspecified';
+      if(!dmgByCropMfr[d.crop]) dmgByCropMfr[d.crop] = {};
+      if(!dmgByCropMfr[d.crop][mfr]) dmgByCropMfr[d.crop][mfr] = 0;
+      dmgByCropMfr[d.crop][mfr] += d.bags;
+      dmgTotal += d.bags;
     }
-    let dmgTotal = 0;
-    Object.keys(dmgByCrop).forEach(c=>{
-      dmgTotal += dmgByCrop[c];
-      lines.push(c + ': ' + dmgByCrop[c] + ' bags damaged');
+    Object.keys(dmgByCropMfr).forEach(c=>{
+      const cropTotal = Object.values(dmgByCropMfr[c]).reduce((a,b)=>a+b, 0);
+      lines.push(c + ': ' + cropTotal + ' bags damaged');
+      Object.keys(dmgByCropMfr[c]).sort((a,b)=> dmgByCropMfr[c][b]-dmgByCropMfr[c][a]).forEach(mfr=>{
+        lines.push('  - ' + mfr + ': ' + dmgByCropMfr[c][mfr] + ' bags');
+      });
     });
     lines.push('Total damaged bags this period: ' + dmgTotal);
+  }
+  lines.push('');
+
+  /* ── FIXED STAFF: SDCs & GUARDS ── */
+  lines.push('*FIXED STAFF (SDCs & GUARDS)*');
+  if(DB.staff.fixedStaff.length === 0){
+    lines.push('No fixed staff recorded.');
+  } else {
+    DB.staff.fixedStaff.forEach(st=>{
+      lines.push(st.name + ' (' + st.role + ')');
+      lines.push('  NRC: ' + (st.nrc || '-') + ' | NAPSA: ' + (st.napsa || '-'));
+      lines.push('  Bank: ' + (st.bankBranch || '-') + ' | Acc No: ' + (st.accountNumber || '-'));
+      if(st.salary) lines.push('  Salary: ' + fmtK(st.salary) + '/mo');
+    });
   }
   lines.push('');
 
@@ -2528,9 +2981,10 @@ document.getElementById('genReportBtn').addEventListener('click', ()=>{
       byWorker[w.workerId].wage += w.wage;
     }
     let total = 0;
+    const reportWorkersMap = workersById();
     for(let j = 0; j < wIds.length; j++){
       const id = wIds[j];
-      const worker = DB.staff.workers.find(w=>w.id===id);
+      const worker = reportWorkersMap.get(id);
       const rec = byWorker[id];
       total += rec.wage;
       const name = worker ? worker.name : 'Unknown';
@@ -2592,6 +3046,35 @@ document.getElementById('stockEditType').addEventListener('change', e=>{
   if(!val){
     document.getElementById('stockEditFields').style.display = 'none';
     document.getElementById('stockEditPreview').textContent = '';
+    return;
+  }
+  if(val === '__add_new__'){
+    const baseName = (prompt('Name of new equipment / requisite item (e.g. Scales, Tent):') || '').trim();
+    const sel = document.getElementById('stockEditType');
+    if(!baseName){ sel.value = ''; document.getElementById('stockEditFields').style.display = 'none'; return; }
+    const size = (prompt('Size / type for ' + baseName + ' (optional, e.g. Digital, 30x30) — leave blank if none:') || '').trim();
+    const name = size ? (baseName + ' - ' + size) : baseName;
+    if(DB.equipment[name]){
+      toast('Item already exists');
+      renderStockEditor();
+      sel.value = 'equip:' + name;
+      sel.dispatchEvent(new Event('change'));
+      return;
+    }
+    const reorderStr = prompt('Reorder level for ' + name + ' (alert when balance falls to or below this):', '20');
+    const reorderLevel = Number(reorderStr);
+    DB.equipment[name] = {
+      transactions: [],
+      reorderLevel: (isNaN(reorderLevel) || reorderLevel < 0) ? DEFAULT_REORDER_LEVEL : reorderLevel,
+      baseType: baseName, size: size
+    };
+    save();
+    renderEquipmentTab();
+    renderDashboard();
+    renderStockEditor();
+    sel.value = 'equip:' + name;
+    toast('New stock item added');
+    sel.dispatchEvent(new Event('change'));
     return;
   }
   document.getElementById('stockEditFields').style.display = 'block';
@@ -2703,10 +3186,39 @@ function renderSettings(){
   f.maName.value = DB.settings.maName || '';
   f.maPhone.value = DB.settings.maPhone || '';
   f.deletePin.value = DB.settings.deletePin || '1234';
+  renderBagWeightTable();
   renderStockEditor();
   updateBrandbar();
   renderCloudSyncCard();
 }
+
+/* Per-crop bag weight table - same live-update pattern as the Pay
+   Rates table (rateTable): auto-saves on 'change', not tied to the
+   Depot Details form's submit button, and re-renders anywhere tonnage
+   is shown so a change here broadcasts immediately. */
+function renderBagWeightTable(){
+  const container = document.getElementById('bagWeightTable');
+  let html = '<table><thead><tr><th>Crop</th><th>Bag weight (kg)</th></tr></thead><tbody>';
+  CROPS.forEach(c=>{
+    const val = bagWeightKg(c);
+    html += '<tr><td>'+c+'</td><td><input type="number" min="1" step="0.1" data-crop="'+c+'" value="'+val+'" style="max-width:100px; padding:5px 6px;"></td></tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+document.getElementById('bagWeightTable').addEventListener('change', e=>{
+  const inp = e.target.matches('input') ? e.target : null;
+  if(!inp) return;
+  const val = Number(inp.value);
+  if(!val || val <= 0){ toast('Enter a valid bag weight'); renderBagWeightTable(); return; }
+  DB.settings.bagWeightKg[inp.dataset.crop] = val;
+  save(); invalidateMemo();
+  /* Broadcast: re-render everywhere tonnage is displayed, same set of
+     views the Depot Details form's own submit handler refreshes. */
+  renderDashboard(); renderGrainTab();
+  toast(inp.dataset.crop + ' bag weight updated');
+});
 
 function renderCloudSyncCard(){
   const linked = document.getElementById('cloudSyncLinked');
@@ -2871,7 +3383,11 @@ async function loadDepotRollup(){
     });
     const equipNames = Object.keys(db.equipment || {});
     let depotLow = 0;
-    equipNames.forEach(n=>{ if(computeEquipBalanceFor(db, n) < 20) depotLow++; });
+    equipNames.forEach(n=>{
+      const item = db.equipment[n] || {};
+      const level = (item.reorderLevel != null) ? item.reorderLevel : DEFAULT_REORDER_LEVEL;
+      if(computeEquipBalanceFor(db, n) <= level) depotLow++;
+    });
     lowEquipCount += depotLow;
     const staffCount = ((db.staff && db.staff.fixedStaff) || []).length + ((db.staff && db.staff.workers) || []).length;
     totalStaff += staffCount;
@@ -2954,9 +3470,10 @@ document.getElementById('settingsForm').addEventListener('submit', e=>{
     province: f.get('province'),
     maName: f.get('maName'),
     maPhone: (f.get('maPhone')||'').trim(),
+    bagWeightKg: DB.settings.bagWeightKg, /* managed by the Bag Weight by Crop table, not this form */
     deletePin: (f.get('deletePin')||'').trim() || '1234'
   };
-  save(); updateBrandbar(); toast('Details saved');
+  save(); updateBrandbar(); invalidateMemo(); renderDashboard(); renderGrainTab(); toast('Details saved');
 });
 
 document.getElementById('exportBtn').addEventListener('click', ()=>{
@@ -3027,17 +3544,68 @@ function initAll(){
 initAll();
 CloudSync.init(); // local UI paints first (above), cloud sync catches up async
 
+/* ===================== INSTALL APP (Add to Home Screen) =====================
+   Two paths: Android/Chrome/Edge support beforeinstallprompt and can be
+   installed with one tap; iOS Safari has no such API, so we just point
+   people to the Share sheet instead. Either way, skip the banner entirely
+   if the app is already running installed (standalone display mode). */
+(function(){
+  const DISMISS_KEY = 'sdm_install_banner_dismissed_v1';
+  const banner = document.getElementById('installBanner');
+  const textEl = document.getElementById('installBannerText');
+  const btn = document.getElementById('installBannerBtn');
+  const closeBtn = document.getElementById('installBannerClose');
+  if(!banner) return;
+
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if(isStandalone) return; /* already installed — nothing to do */
+  if(localStorage.getItem(DISMISS_KEY)) return; /* user dismissed it before */
+
+  const ua = navigator.userAgent || '';
+  const isIOS = /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+
+  let deferredPrompt = null;
+
+  window.addEventListener('beforeinstallprompt', (e)=>{
+    e.preventDefault();
+    deferredPrompt = e;
+    banner.style.display = 'flex';
+  });
+
+  if(isIOS){
+    /* iOS never fires beforeinstallprompt — show manual instructions instead */
+    textEl.textContent = 'Install this app: tap the Share icon, then "Add to Home Screen".';
+    btn.style.display = 'none';
+    banner.style.display = 'flex';
+  }
+
+  btn.addEventListener('click', async ()=>{
+    if(!deferredPrompt) return;
+    banner.style.display = 'none';
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  });
+
+  closeBtn.addEventListener('click', ()=>{
+    banner.style.display = 'none';
+    localStorage.setItem(DISMISS_KEY, '1');
+  });
+
+  window.addEventListener('appinstalled', ()=>{
+    banner.style.display = 'none';
+  });
+})();
+
 /* ===================== PHASE 8 — SERVICE WORKER (offline shell) =====================
    Registers sw.js with the current APP_VER in the query string, so a bumped
    APP_VER automatically produces a new SW script URL, which the browser/
    WebView treats as an update check — no manual cache-busting step needed
    beyond bumping the one constant above.
 
-   NOTE before wrapping a new build in Median: confirm the refresh-triggers-
-   logout fix in SDC (index.html) has landed and been verified there first.
-   Manager 3 shares the same anonymous-auth + firebase persistence pattern,
-   so it's exposed to the same class of bug once this SW starts serving the
-   shell from cache on refresh/relaunch instead of a fresh network load. */
+   sw.js is a small separate file that must sit next to this HTML file
+   wherever it's deployed (e.g. GitHub Pages) — it can't be inlined, since
+   service workers must be registered from their own script URL. */
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.register(`sw.js?v=${APP_VER}`)
@@ -3077,5 +3645,5 @@ function notifyUpdateReady(worker){
   document.body.appendChild(bar);
 }
 </script>
-</body>
-</html>
+
+</body></html>
