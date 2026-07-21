@@ -441,11 +441,7 @@
     </div>
     <div id="authSignupForm" style="display:none;">
       <h2>Create account</h2>
-      <div class="auth-sub">Tell us which role you'll be using this app as</div>
-      <div class="auth-role-toggle">
-        <button type="button" class="active" id="authRoleClerkBtn" data-role="CLERK">Depot Clerk</button>
-        <button type="button" id="authRoleAssistantBtn" data-role="ASSISTANT">Marketing Assistant</button>
-      </div>
+      <div class="auth-sub">Marketing Assistant sign-up</div>
       <label>Your name</label>
       <input type="text" id="authSignupName">
       <label>Username</label>
@@ -454,10 +450,6 @@
       <input type="password" id="authSignupPassword" autocomplete="new-password">
       <label>Confirm password</label>
       <input type="password" id="authSignupPassword2" autocomplete="new-password">
-      <div id="authSignupDepotWrap">
-        <label>Depot code (given to you by your depot)</label>
-        <input type="text" id="authSignupDepotCode" placeholder="e.g. SD-7K3P9Q" style="text-transform:uppercase;">
-      </div>
       <div class="auth-error" id="authSignupError"></div>
       <button class="auth-primary-btn" type="button" id="authSignupBtn">Create account</button>
       <div class="auth-switch">Already have an account? <a id="authGoToLogin">Sign in</a></div>
@@ -975,7 +967,7 @@
 // registration URL below, so the service worker cache name always tracks
 // this single constant — no need to hand-edit a separate CACHE_NAME in
 // sw.js and risk the two drifting out of sync.
-const APP_VER = 'v1.2.0'; // bumped: depot-isolation session-pointer fix + password hashing
+const APP_VER = 'v1.2.1'; // bumped: sign-up is Marketing-Assistant-only now (Clerk not self-service)
 const STORAGE_KEY = 'fraDepotData_v3';
 const CROPS = ['Maize','Soyabeans','Rice'];
 const DEFAULT_EQUIPMENT = ['Bags','Twine','Sieves','Tents','Scales'];
@@ -1687,7 +1679,7 @@ const AppAuth = {
   async _findByUsername(username){
     const q = `${SDM_USERS_NODE}.json?orderBy=${encodeURIComponent('"username"')}&equalTo=${encodeURIComponent('"'+username+'"')}`;
     const result = await this._rtdb(q, 'GET');
-    if(!result) return null;
+    if(!result || Object.keys(result).length === 0) return null;
     const id = Object.keys(result)[0];
     return { id, ...result[id] };
   },
@@ -4029,27 +4021,12 @@ function bootApp(){
   const signupForm = document.getElementById('authSignupForm');
   const loginErr = document.getElementById('authLoginError');
   const signupErr = document.getElementById('authSignupError');
-  const depotWrap = document.getElementById('authSignupDepotWrap');
-  let signupRole = 'CLERK';
 
   document.getElementById('authGoToSignup').addEventListener('click', ()=>{
     loginForm.style.display = 'none'; signupForm.style.display = '';
   });
   document.getElementById('authGoToLogin').addEventListener('click', ()=>{
     signupForm.style.display = 'none'; loginForm.style.display = '';
-  });
-
-  document.getElementById('authRoleClerkBtn').addEventListener('click', function(){
-    signupRole = 'CLERK';
-    this.classList.add('active');
-    document.getElementById('authRoleAssistantBtn').classList.remove('active');
-    depotWrap.style.display = '';
-  });
-  document.getElementById('authRoleAssistantBtn').addEventListener('click', function(){
-    signupRole = 'ASSISTANT';
-    this.classList.add('active');
-    document.getElementById('authRoleClerkBtn').classList.remove('active');
-    depotWrap.style.display = 'none';
   });
 
   document.getElementById('authLoginBtn').addEventListener('click', async ()=>{
@@ -4070,6 +4047,8 @@ function bootApp(){
     btn.disabled = false; btn.textContent = 'Sign in';
   });
 
+  // Sign-up is Marketing-Assistant-only - Clerk accounts are no longer
+  // self-service from this screen (role is fixed, no depot-code field).
   document.getElementById('authSignupBtn').addEventListener('click', async ()=>{
     signupErr.classList.remove('show');
     const pw = document.getElementById('authSignupPassword').value;
@@ -4086,8 +4065,7 @@ function bootApp(){
         name: document.getElementById('authSignupName').value,
         username: document.getElementById('authSignupUsername').value,
         password: pw,
-        role: signupRole,
-        depotCode: document.getElementById('authSignupDepotCode').value
+        role: 'ASSISTANT'
       });
       await bootAfterAuth();
       toast('Account created - welcome, ' + AppAuth.session.name);
