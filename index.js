@@ -393,3 +393,229 @@ exports.sdmSignup = onCall(async (request) => {
     depotIds: record.depotIds || {},
   };
 });
+
+/* ==================================================================== */
+/* Helper: resolve the caller's satDepotManagerUsers account from their  */
+/* own session pointer - never trusts a client-supplied userId, so a     */
+/* forged/guessed userId can't be used to edit someone else's account.   */
+/* ==================================================================== */
+async function sdmResolveCallerAccount(callerUid) {
+  const sessionSnap = await db.ref(`satDepotManagerSessions/${callerUid}`).get();
+  if (!sessionSnap.exists()) {
+    throw new HttpsError("failed-precondition", "No active session. Please log in again.");
+  }
+  const userId = sessionSnap.val().userId;
+  const userSnap = await db.ref(`satDepotManagerUsers/${userId}`).get();
+  if (!userSnap.exists() || userSnap.val().deleted) {
+    throw new HttpsError("not-found", "Account not found. Please log in again.");
+  }
+  return { userId, user: userSnap.val() };
+}
+
+/* ==================================================================== */
+/* 5. linkDepotForAssistant                                              */
+/*    Adds a depotId to the caller's own depotIds and refreshes their    */
+/*    session pointer to match, both via Admin SDK - replaces the        */
+/*    direct-RTDB-write version of rememberDepotForAssistant now that     */
+/*    satDepotManagerUsers/satDepotManagerSessions are client deny-all.   */
+/* ==================================================================== */
+exports.linkDepotForAssistant = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in to link a depot.");
+  }
+  const { depotId } = request.data || {};
+  if (!depotId) {
+    throw new HttpsError("invalid-argument", "depotId is required.");
+  }
+
+  const { userId, user } = await sdmResolveCallerAccount(request.auth.uid);
+  if (user.role !== "ASSISTANT") {
+    throw new HttpsError("permission-denied", "Only assistants can link depots.");
+  }
+
+  const depotIds = { ...(user.depotIds || {}), [depotId]: true };
+  await db.ref(`satDepotManagerUsers/${userId}/depotIds/${depotId}`).set(true);
+  await db.ref(`satDepotManagerSessions/${request.auth.uid}`).update({
+    depotIds,
+    loggedInAt: admin.database.ServerValue.TIMESTAMP,
+  });
+
+  return { depotIds };
+});
+
+/* ==================================================================== */
+/* 6. unlinkDepotForAssistant                                           */
+/*    Removes a depotId from the caller's own depotIds and refreshes    */
+/*    their session pointer to match - the unlink counterpart to        */
+/*    linkDepotForAssistant above.                                      */
+/* ==================================================================== */
+exports.unlinkDepotForAssistant = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in to unlink a depot.");
+  }
+  const { depotId } = request.data || {};
+  if (!depotId) {
+    throw new HttpsError("invalid-argument", "depotId is required.");
+  }
+
+  const { userId, user } = await sdmResolveCallerAccount(request.auth.uid);
+  if (user.role !== "ASSISTANT") {
+    throw new HttpsError("permission-denied", "Only assistants can unlink depots.");
+  }
+
+  const depotIds = { ...(user.depotIds || {}) };
+  delete depotIds[depotId];
+  await db.ref(`satDepotManagerUsers/${userId}/depotIds/${depotId}`).remove();
+  await db.ref(`satDepotManagerSessions/${request.auth.uid}`).update({
+    depotIds,
+    loggedInAt: admin.database.ServerValue.TIMESTAMP,
+  });
+
+  return { depotIds };
+});
+
+/* ==================================================================== */
+/* 7. transferClerkToDepot                                              */
+/*    Moves a CLERK account's single depotId to a new depot. Called by  */
+/*    an ASSISTANT who oversees both the clerk's current depot and the   */
+/*    destination depot (i.e. both are in the assistant's own depotIds - */
+/*    same identity-boundary reasoning as linkDepotForAssistant above:   */
+/*    an assistant shouldn't be able to pull a clerk out of a depot they */
+/*    have no oversight of, or drop them into one they don't manage).    */
+/*                                                                        */
+/*    Deliberately never touches satDepotManager/{depotId} - the actual  */
+/*    depot data - at all, for either the old or new depot. This is what */
+/*    keeps past records untouched: a clerk's depotId is just a pointer  */
+/*    on their account (and a copy on their live session pointer(s));    */
+/*    the depot's own stock/personnel/etc. data is stored under its own  */
+/*    depotId regardless of which clerk is currently assigned there, so  */
+/*    moving the pointer changes access, never data. The old depot's     */
+/*    records remain exactly as they were, readable by whichever clerk   */
+/*    (or assistant) is linked to that depotId afterward.                */
+/*                                                                        */
+/*    Also updates every live session pointer for this clerk (there may  */
+/*    be more than one if they're logged in on multiple devices) in the  */
+/*    same atomic multi-path update as the account record - otherwise a  */
+/*    currently-logged-in clerk would keep old-depot access until their  */
+/*    next login, since the RTDB rule checks the session pointer's own   */
+/*    depotId copy, not the account record.                              */
+/* ==================================================================== */
+exports.transferClerkToDepot = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in to transfer a clerk.");
+  }
+  const { clerkUserId, newDepotId } = request.data || {};
+  if (!clerkUserId || !newDepotId) {
+    throw new HttpsError("invalid-argument", "clerkUserId and newDepotId are required.");
+  }
+  const normalizedNewDepotId = newDepotId.trim().toUpperCase();
+  if (!normalizedNewDepotId) {
+    throw new HttpsError("invalid-argument", "newDepotId cannot be empty.");
+  }
+
+  const { user: caller } = await sdmResolveCallerAccount(request.auth.uid);
+  if (caller.role !== "ASSISTANT") {
+    throw new HttpsError("permission-denied", "Only assistants can transfer clerks between depots.");
+  }
+
+  const clerkSnap = await db.ref(`satDepotManagerUsers/${clerkUserId}`).get();
+  if (!clerkSnap.exists() || clerkSnap.val().deleted) {
+    throw new HttpsError("not-found", "Clerk account not found.");
+  }
+  const clerk = clerkSnap.val();
+  if (clerk.role !== "CLERK") {
+    throw new HttpsError("invalid-argument", "Target account is not a clerk.");
+  }
+  const oldDepotId = clerk.depotId || null;
+
+  const callerDepotIds = caller.depotIds || {};
+  if (!oldDepotId || !callerDepotIds[oldDepotId]) {
+    throw new HttpsError(
+      "permission-denied",
+      "You must oversee the clerk's current depot to transfer them."
+    );
+  }
+  if (!callerDepotIds[normalizedNewDepotId]) {
+    throw new HttpsError(
+      "permission-denied",
+      "You must oversee the destination depot to transfer a clerk into it."
+    );
+  }
+
+  if (oldDepotId === normalizedNewDepotId) {
+    return { clerkUserId, oldDepotId, newDepotId: normalizedNewDepotId, sessionsUpdated: 0, noop: true };
+  }
+
+  // Find every live session pointer for this clerk (possibly more than
+  // one device) so they can all be updated in the same atomic write as
+  // the account record - see the function-level comment above.
+  const sessionsSnap = await db
+    .ref("satDepotManagerSessions")
+    .orderByChild("userId")
+    .equalTo(clerkUserId)
+    .get();
+
+  const updates = {};
+  updates[`satDepotManagerUsers/${clerkUserId}/depotId`] = normalizedNewDepotId;
+  let sessionsUpdated = 0;
+  if (sessionsSnap.exists()) {
+    sessionsSnap.forEach((child) => {
+      updates[`satDepotManagerSessions/${child.key}/depotId`] = normalizedNewDepotId;
+      updates[`satDepotManagerSessions/${child.key}/loggedInAt`] = admin.database.ServerValue.TIMESTAMP;
+      sessionsUpdated++;
+    });
+  }
+  await db.ref().update(updates);
+
+  return { clerkUserId, oldDepotId, newDepotId: normalizedNewDepotId, sessionsUpdated };
+});
+
+/* ==================================================================== */
+/* 8. listClerksInDepot                                                 */
+/*    Returns the CLERK accounts currently pointing at a given depot,   */
+/*    so an ASSISTANT's "Transfer Clerk" screen has something to pick   */
+/*    from - satDepotManagerUsers is client deny-all, so there's no     */
+/*    other way for the client to know which clerks exist there.        */
+/*    Same oversight check as transferClerkToDepot: the caller must be  */
+/*    an ASSISTANT with this depotId already in their own depotIds -    */
+/*    an assistant shouldn't be able to enumerate clerks in a depot      */
+/*    they have no oversight of.                                        */
+/* ==================================================================== */
+exports.listClerksInDepot = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in to list clerks.");
+  }
+  const { depotId } = request.data || {};
+  if (!depotId) {
+    throw new HttpsError("invalid-argument", "depotId is required.");
+  }
+  const normalizedDepotId = depotId.trim().toUpperCase();
+
+  const { user: caller } = await sdmResolveCallerAccount(request.auth.uid);
+  if (caller.role !== "ASSISTANT") {
+    throw new HttpsError("permission-denied", "Only assistants can list a depot's clerks.");
+  }
+  if (!(caller.depotIds || {})[normalizedDepotId]) {
+    throw new HttpsError(
+      "permission-denied",
+      "You must oversee this depot to list its clerks."
+    );
+  }
+
+  const snap = await db
+    .ref("satDepotManagerUsers")
+    .orderByChild("depotId")
+    .equalTo(normalizedDepotId)
+    .get();
+
+  const clerks = [];
+  if (snap.exists()) {
+    snap.forEach((child) => {
+      const val = child.val();
+      if (val.role === "CLERK" && !val.deleted) {
+        clerks.push({ userId: child.key, name: val.name, username: val.username });
+      }
+    });
+  }
+  return { clerks };
+});

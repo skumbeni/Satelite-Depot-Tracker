@@ -851,7 +851,7 @@
       <div id="cloudSyncUnlinked" style="display: none;" data-clerk-hide="true">
         <label>Have a depot code from another device?</label>
         <div class="row2">
-          <input type="text" id="depotCodeInput" placeholder="e.g. SD-7K3P9Q" style="text-transform:uppercase;">
+          <input type="text" id="depotCodeInput" placeholder="e.g. LUA-MWE-MUT-SK7Q3M" style="text-transform:uppercase;">
           <button class="btn btn-primary" type="button" id="linkDepotBtn">Link</button>
         </div>
         <p class="muted" style="margin:10px 0 4px;">Setting up this depot for the first time?</p>
@@ -884,7 +884,7 @@
         <label>Add another depot to your list</label>
         <input type="text" id="addDepotIndexLabel" placeholder="Label, e.g. Mansa - Main">
         <div class="row2" style="margin-top:6px;">
-          <input type="text" id="addDepotIndexCode" placeholder="Depot code, e.g. SD-7K3P9Q" style="text-transform:uppercase;">
+          <input type="text" id="addDepotIndexCode" placeholder="Depot code, e.g. LUA-MWE-MUT-SK7Q3M" style="text-transform:uppercase;">
           <button class="btn" type="button" id="addDepotIndexBtn">Add</button>
         </div>
         <p class="muted" style="margin-top:4px;">Adds it to your list without switching to it now.</p>
@@ -894,6 +894,17 @@
       <h2>Combined Totals <span class="sub">read-only roll-up across all your depots</span></h2>
       <button class="btn btn-block" type="button" id="loadRollupBtn">Load combined totals</button>
       <div id="depotRollupView" style="display:none;margin-top:10px;"></div>
+    </div>
+    <div class="card">
+      <h2>Transfer Clerk <span class="sub">move a clerk from this depot to another you manage</span></h2>
+      <p class="muted" id="transferClerkStatus">Loading clerks for this depot…</p>
+      <div id="transferClerkForm" style="display:none;">
+        <label>Clerk</label>
+        <select id="transferClerkSelect"></select>
+        <label>Move to</label>
+        <select id="transferClerkDestSelect"></select>
+        <button class="btn btn-primary btn-block" type="button" id="transferClerkBtn" style="margin-top:8px;">Transfer</button>
+      </div>
     </div>
     </div>
     <div class="card">
@@ -967,7 +978,7 @@
 // registration URL below, so the service worker cache name always tracks
 // this single constant — no need to hand-edit a separate CACHE_NAME in
 // sw.js and risk the two drifting out of sync.
-const APP_VER = 'v1.2.1'; // bumped: sign-up is Marketing-Assistant-only now (Clerk not self-service)
+const APP_VER = 'v1.3.0'; // bumped: Marketing-Assistant "Transfer Clerk" screen, and depot codes now derived from province/district/depot name/MA username instead of pure-random
 const STORAGE_KEY = 'fraDepotData_v3';
 const CROPS = ['Maize','Soyabeans','Rice'];
 const DEFAULT_EQUIPMENT = ['Bags','Twine','Sieves','Tents','Scales'];
@@ -991,8 +1002,10 @@ const DEFAULT_PAY_RATE = 0;
    rule that this app's flat blob doesn't match) - the same flat-JSON-per-tenant
    shape this app already uses for localStorage, so nothing about DB/defaultDB()/render()
    needs to change. depotId is a short human-shareable code (e.g.
-   "SD-7K3P9Q") generated on first "Create cloud depot" and then entered
-   on any other device that should see the same depot's data.
+   "LUA-MWE-MUT-SK7Q3M" - province/district/depot-name/MA-derived, see
+   CloudSync.generateDepotCode() below) generated on first "Create cloud
+   depot" and then entered on any other device that should see the same
+   depot's data.
 
    Auth is anonymous - it only exists to satisfy RTDB's `auth != null`
    rule. The real access boundary is the depotId path itself, matching
@@ -1122,17 +1135,15 @@ const DEFAULT_PAY_RATE = 0;
    publish; nothing in index.html or index.js needs to change for this
    part.
 
-   Known remaining gap, left as-is for now: satDepotManagerUsers keeps
-   its parent-level ".read": "auth != null" (PHASE 10 above) because the
-   client's username-lookup query (_findByUsername, an orderByChild
-   query) needs root-level read to work at all. That means any logged-in
-   Assistant/Clerk can still list every other account's username, name,
-   role and depotId/depotIds (not their depot data - just the account
-   directory). Closing that fully means moving login/signup off direct
-   client RTDB calls onto the sdmLogin/sdmSignup Cloud Functions already
-   sitting in index.js (Admin SDK bypasses rules, so the rule could then
-   go back to deny-all) - a real client-code change, out of scope for
-   this pass unless wanted.
+   Known gap from this phase, closed by PHASE 13 below: satDepotManagerUsers
+   originally kept its parent-level ".read": "auth != null" (PHASE 10 above)
+   because the client's username-lookup query (_findByUsername, an
+   orderByChild query) needed root-level read to work at all - meaning any
+   logged-in Assistant/Clerk could list every other account's username,
+   name, role and depotId/depotIds (not their depot data - just the
+   account directory). PHASE 13 moves login/signup/link/unlink onto Cloud
+   Functions (Admin SDK bypasses rules) so this node - and
+   satDepotManagerSessions - can go back to client deny-all.
    ========================================================================= */
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBnfmuR0RNSPMMD77KNFrnw4_6aQgg0F74",
@@ -1417,14 +1428,34 @@ const CloudSync = {
     }
   },
 
-  // Generates a short, human-shareable depot code (no ambiguous chars),
-  // e.g. "SD-7K3P9Q" - this is what an operator reads out over the phone
-  // to link a second device to the same depot.
+  // Turns free text into a fixed-width uppercase-letters-only fragment,
+  // e.g. "Luapula" -> "LUA", "Mwense" -> "MWE". Pads with 'X' when the
+  // source is short, empty, or all-numeric, so a code segment is always
+  // exactly `len` characters wide even before Settings has been filled in.
+  _codeFragment(text, len){
+    const letters = (text || '').toUpperCase().replace(/[^A-Z]/g, '');
+    return (letters + 'XXXX').slice(0, len);
+  },
+
+  // Generates a depot code built from the depot's own province/district/
+  // name plus the creating Marketing Assistant's username, so the code
+  // is recognisable at a glance instead of a pure-random string - e.g.
+  // province "Luapula", district "Mwense", depot name "Mutipula", MA
+  // username "skumbeni" -> "LUA-MWE-MUT-SK7Q3M". The last segment still
+  // ends with 4 random characters (same no-ambiguous-character alphabet
+  // as before) purely for collision safety: satDepotManager's own read
+  // rule requires already being linked to a code before it can be read,
+  // so there's no way to check a candidate code's availability against
+  // RTDB up front - randomness has to do that job instead of a lookup.
   generateDepotCode(){
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for(let i=0;i<6;i++) code += chars.charAt(Math.floor(Math.random()*chars.length));
-    return 'SD-' + code;
+    let rand = '';
+    for(let i=0;i<4;i++) rand += chars.charAt(Math.floor(Math.random()*chars.length));
+    const prov = this._codeFragment(DB.settings.province, 3);
+    const dist = this._codeFragment(DB.settings.district, 3);
+    const name = this._codeFragment(DB.settings.depotName, 3);
+    const ma = this._codeFragment(AppAuth.session && AppAuth.session.username, 2);
+    return `${prov}-${dist}-${name}-${ma}${rand}`;
   },
 
   setDepotId(id){
@@ -1582,87 +1613,66 @@ const CloudSync = {
    (legacy records may still have a plaintext `password` field instead of
    `passwordHash`/`salt` - see NOTE ON SECURITY below.)
 
-   NOTE ON SECURITY: passwords are now stored as a per-user-salted,
-   PBKDF2-SHA256 (100k iterations) hash rather than plaintext - see
-   sdmHashPassword() below. Any record created before this pass still has
-   its original plaintext `password` field; login() checks for that as a
-   fallback and migrates the record to a hash in place the moment that
-   account successfully logs in again, so plaintext naturally drains out
-   over time without a forced reset. This still doesn't move the check
-   into a Cloud Function - `satDepotManagerUsers` still needs broad
-   `auth != null` read access for the client-side username-lookup query
-   to work at all, so a hash is a real improvement (a leaked dump costs
-   real compute to crack instead of being usable as-is) but not a
-   hardened boundary. A Cloud-Function-backed login remains the fix if
-   this ever needs to survive a genuinely hostile network - out of scope
-   for this pass.
-
-   Server-side enforcement: because CloudSync's Firebase Auth is anonymous
-   (a fresh UID per device/reinstall, not tied to the username/password),
-   real enforcement needs a session pointer keyed by that anonymous UID -
-   see `satDepotManagerSessions/{auth.uid}` below, refreshed on every
-   login. RTDB rules deployed alongside this (extends the draft in the
-   CLOUD SYNC comment above):
-
-     "satDepotManagerUsers": {
-       ".read": "auth != null",
-       ".indexOn": ["username"],
-       "$id": {
-         ".write": "auth != null",
-         ".validate": "newData.hasChildren(['username','name','role']) && newData.child('username').isString() && newData.child('username').val().length > 0 && ((newData.hasChildren(['passwordHash','salt']) && newData.child('passwordHash').isString() && newData.child('passwordHash').val().length >= 32 && newData.child('salt').isString() && newData.child('salt').val().length >= 16) || (newData.hasChild('password') && newData.child('password').isString() && newData.child('password').val().length >= 6)) && ((newData.child('role').val() == 'CLERK' && newData.hasChild('depotId')) || (newData.child('role').val() == 'ASSISTANT'))"
-       }
-     },
-     "satDepotManagerSessions": {
-       "$uid": {
-         ".read": "auth != null && auth.uid == $uid",
-         ".write": "auth != null && auth.uid == $uid"
-       }
-     }
-
-   The validate rule still accepts a bare `password` field so any
-   not-yet-migrated legacy record can still be re-written (e.g. by
-   forgetDepotForAssistant's sibling paths, or a future admin edit)
-   without failing validation before its next login migrates it - once
-   you've confirmed (via a one-off export) that no records have a
-   `password` field left, drop that branch of the OR and require the
-   hash unconditionally.
+   NOTE ON SECURITY (superseded by PHASE 13 below): this phase originally
+   hashed passwords client-side (PBKDF2-SHA256, 100k iterations) but still
+   needed `satDepotManagerUsers` to grant broad `auth != null` read access
+   so the client's own username-lookup query could work at all - a real
+   improvement over plaintext, but not a hardened boundary, since any
+   logged-in account could still list every other account's directory
+   entry. PHASE 13 closes this by moving login/signup/link/unlink onto
+   Cloud Functions (Admin SDK bypasses rules) and locking both
+   `satDepotManagerUsers` and `satDepotManagerSessions` to client
+   deny-all - see PHASE 13 below for the final rules and the retired
+   client-side hashing code this replaced.
 
    Until PHASE 12 below, `satDepotManager/$depotId` write access was still
    the simpler "any authed session, any depotId" rule from Phase 7 - this
    phase added the client-side login/role UX; PHASE 12 is the follow-up
    that actually tightens the depot-data rule to check the session pointer. */
-const SDM_USERS_NODE = 'satDepotManagerUsers';
-const SDM_SESSIONS_NODE = 'satDepotManagerSessions';
+/* ===================== PHASE 13 — CLOUD-FUNCTION-BACKED LOGIN, FULL ACCOUNT-NODE LOCKDOWN =====================
+   Closes the gap flagged in PHASE 12: login/signup/link/unlink now go
+   through the sdmLogin/sdmSignup/linkDepotForAssistant/
+   unlinkDepotForAssistant Cloud Functions in index.js (Admin SDK bypasses
+   rules) instead of direct client RTDB calls. That removes every reason
+   a client ever needed to read or write satDepotManagerUsers or
+   satDepotManagerSessions directly, so both go back to full deny-all:
+
+     "satDepotManagerUsers": {
+       ".read": false,
+       ".write": false,
+       ".indexOn": ["username"]
+     },
+     "satDepotManagerSessions": {
+       ".read": false,
+       ".write": false
+     }
+
+   (.indexOn stays even though the client never queries this node anymore
+   - sdmLogin/sdmSignup's orderByChild('username') query still runs
+   through the same query engine under the Admin SDK, and still benefits
+   from the index.) The satDepotManager/$depotId rule from PHASE 12 is
+   unaffected - it reads satDepotManagerSessions via `root.child(...)`
+   inside the rule expression itself, which always has access regardless
+   of that node's own .read/.write rules.
+
+   Retired by this pass, since login/signup no longer touch RTDB directly
+   and password hashing now happens entirely inside sdmLogin/sdmSignup on
+   the server: the client-side PBKDF2 helpers (sdmHashPassword,
+   sdmRandomSaltHex, _sdmBytesToHex/_sdmHexToBytes), the standalone _rtdb
+   fetch helper, _findByUsername, and _refreshServerSession. See
+   AppAuth._callFunction below for the one new piece of plumbing this
+   added - a minimal callable-Cloud-Function fetch helper, same
+   fetch()-based style as _rtdb had, since index.html doesn't load the
+   Functions SDK.
+
+   Net effect: a forged or guessed session pointer is no longer possible
+   at all, since nothing outside the Admin SDK can write
+   satDepotManagerSessions - the residual gap PHASE 12 left open is now
+   fully closed.
+   ========================================================================= */
 const SDM_SESSION_KEY = 'sdmSession_v1';
-
-// ---- Password hashing (PBKDF2-SHA256, per-account random salt) ----
-// See the NOTE ON SECURITY above: this replaces the plaintext `password`
-// field. Uses the browser's native WebCrypto (available in any modern
-// WebView, including Median.co's Android wrapper) rather than pulling in
-// a JS crypto library for one function.
-const SDM_PBKDF2_ITERATIONS = 100000;
-
-function _sdmBytesToHex(bytes){
-  return Array.from(bytes).map(b=> b.toString(16).padStart(2,'0')).join('');
-}
-function _sdmHexToBytes(hex){
-  const out = new Uint8Array(hex.length/2);
-  for(let i=0;i<out.length;i++) out[i] = parseInt(hex.substr(i*2,2), 16);
-  return out;
-}
-function sdmRandomSaltHex(){
-  return _sdmBytesToHex(crypto.getRandomValues(new Uint8Array(16)));
-}
-async function sdmHashPassword(password, saltHex){
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt: _sdmHexToBytes(saltHex), iterations: SDM_PBKDF2_ITERATIONS, hash: 'SHA-256' },
-    keyMaterial, 256
-  );
-  return _sdmBytesToHex(new Uint8Array(bits));
-}
+const SDM_FUNCTIONS_REGION = 'us-central1'; // default region for the onCall functions in index.js
+const SDM_FUNCTIONS_BASE = `https://${SDM_FUNCTIONS_REGION}-${FIREBASE_CONFIG.projectId}.cloudfunctions.net`;
 
 const AppAuth = {
   session: null, // { userId, username, name, role, depotId, depotIds }
@@ -1678,26 +1688,40 @@ const AppAuth = {
   isAssistant(){ return !!this.session && this.session.role === 'ASSISTANT'; },
   isClerk(){ return !!this.session && this.session.role === 'CLERK'; },
 
-  // Small standalone fetch helper (separate from CloudSync._request since
-  // this needs RTDB query params, not just a plain path) - same timeout/
-  // retry budget as the rest of the app for consistency on weak 4G.
-  async _rtdb(pathWithQuery, method, body){
+  // Minimal callable-Cloud-Function fetch helper - index.html only loads
+  // firebase-app + firebase-auth (no Functions SDK), so this speaks the
+  // callable-function HTTPS protocol directly instead of pulling in
+  // another bundle: POST {data} with an Authorization: Bearer <idToken>
+  // header, same timeout/retry budget style as the old _rtdb had.
+  async _callFunction(name, data){
     const budget = networkBudget();
     const token = await CloudSync._authToken();
-    const base = FIREBASE_CONFIG.databaseURL.replace(/\/$/, '');
-    const sep = pathWithQuery.includes('?') ? '&' : '?';
-    const url = `${base}/${pathWithQuery}${sep}${token ? 'auth='+token : ''}`;
+    const url = `${SDM_FUNCTIONS_BASE}/${name}`;
     let attempt = 0;
     for(;;){
       const controller = new AbortController();
       const timer = setTimeout(()=> controller.abort(), budget.timeoutMs);
       try{
-        const opts = { method, signal: controller.signal };
-        if(body !== undefined) opts.body = JSON.stringify(body);
-        const res = await fetch(url, opts);
+        const res = await fetch(url, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': 'Bearer '+token } : {})
+          },
+          body: JSON.stringify({ data })
+        });
         clearTimeout(timer);
-        if(!res.ok) throw Object.assign(new Error('RTDB '+method+' failed: '+res.status), { retryable: res.status >= 500 });
-        return res.status === 204 ? null : res.json();
+        const json = await res.json().catch(()=> ({}));
+        if(!res.ok || json.error){
+          const err = json.error || {};
+          const permissionDenied = err.status === 'PERMISSION_DENIED' || err.status === 'UNAUTHENTICATED' || res.status === 401 || res.status === 403;
+          throw Object.assign(new Error(err.message || (name+' failed: '+res.status)), {
+            retryable: !permissionDenied && res.status >= 500,
+            permissionDenied
+          });
+        }
+        return json.result;
       }catch(e){
         clearTimeout(timer);
         const retryable = e.name === 'AbortError' || e.retryable !== false;
@@ -1708,45 +1732,19 @@ const AppAuth = {
     }
   },
 
-  async _findByUsername(username){
-    const q = `${SDM_USERS_NODE}.json?orderBy=${encodeURIComponent('"username"')}&equalTo=${encodeURIComponent('"'+username+'"')}`;
-    const result = await this._rtdb(q, 'GET');
-    if(!result || Object.keys(result).length === 0) return null;
-    const id = Object.keys(result)[0];
-    return { id, ...result[id] };
-  },
-
   async login(username, password){
     username = (username||'').trim();
     if(!username || !password) throw new Error('Enter your username and password.');
-    const user = await this._findByUsername(username);
-    if(!user || user.deleted) throw new Error('No account found with that username.');
-
-    let ok = false;
-    if(user.passwordHash && user.salt){
-      ok = (await sdmHashPassword(password, user.salt)) === user.passwordHash;
-    } else if(user.password !== undefined){
-      // Legacy plaintext record from before the hashing fix. Verify the
-      // old way, then migrate this one record to a hash right now so a
-      // successful login is also the moment plaintext stops existing for
-      // this account - no separate migration pass or forced reset needed.
-      ok = user.password === password;
-      if(ok){
-        const salt = sdmRandomSaltHex();
-        const passwordHash = await sdmHashPassword(password, salt);
-        try{ await this._rtdb(`${SDM_USERS_NODE}/${user.id}.json`, 'PATCH', { passwordHash, salt, password: null }); }
-        catch(e){ console.warn('Password migration to hash failed, will retry next login:', e); }
-      }
-    }
-    if(!ok) throw new Error('Incorrect password.');
-
+    // sdmLogin verifies the password and writes the session pointer
+    // server-side (Admin SDK) before returning - nothing left to do here
+    // but store what it hands back.
+    const result = await this._callFunction('sdmLogin', { username, password });
     this.session = {
-      userId: user.id, username: user.username, name: user.name, role: user.role,
-      depotId: user.depotId || null,
-      depotIds: user.depotIds || {}
+      userId: result.userId, username: result.username, name: result.name, role: result.role,
+      depotId: result.depotId || null,
+      depotIds: result.depotIds || {}
     };
     this.saveLocalSession();
-    await this._refreshServerSession();
     return this.session;
   },
 
@@ -1755,65 +1753,64 @@ const AppAuth = {
     if(!name || !username || !password) throw new Error('Fill in all fields.');
     if(password.length < 6) throw new Error('Password must be at least 6 characters.');
     if(role === 'CLERK' && !(depotCode||'').trim()) throw new Error('Enter the depot code your depot uses.');
-    const existing = await this._findByUsername(username);
-    if(existing && !existing.deleted) throw new Error('That username is already taken.');
-
-    const salt = sdmRandomSaltHex();
-    const passwordHash = await sdmHashPassword(password, salt);
-    const record = { name, username, passwordHash, salt, role, createdAt: Date.now() };
-    if(role === 'CLERK') record.depotId = depotCode.trim().toUpperCase();
-    else record.depotIds = {};
-
-    const created = await this._rtdb(SDM_USERS_NODE + '.json', 'POST', record);
+    // sdmSignup does the username-uniqueness check, hashes the password,
+    // and writes the session pointer, all server-side.
+    const result = await this._callFunction('sdmSignup', { name, username, password, role, depotCode });
     this.session = {
-      userId: created.name, username, name, role,
-      depotId: record.depotId || null,
-      depotIds: record.depotIds || {}
+      userId: result.userId, username: result.username, name: result.name, role: result.role,
+      depotId: result.depotId || null,
+      depotIds: result.depotIds || {}
     };
     this.saveLocalSession();
-    await this._refreshServerSession();
     return this.session;
   },
 
-  // Ties the current device's anonymous Firebase-Auth UID to this account,
-  // so RTDB rules (once tightened per the comment above) can check "does
-  // this UID's session say it may write to this depotId" without needing
-  // real Firebase Auth accounts.
-  async _refreshServerSession(){
-    if(!CloudSync.configured || !this.session) return;
-    try{
-      const user = await CloudSync.authReady;
-      if(!user) return;
-      await this._rtdb(`${SDM_SESSIONS_NODE}/${user.uid}.json`, 'PUT', {
-        userId: this.session.userId, role: this.session.role,
-        depotId: this.session.depotId, depotIds: this.session.depotIds,
-        loggedInAt: Date.now()
-      });
-    }catch(e){ console.warn('Session pointer sync failed (login still works locally):', e); }
-  },
-
-  // Persists a depotId into the logged-in Assistant's own account record,
-  // so their linked-depot list follows them across devices/logins instead
-  // of only living in this device's local DepotIndex cache.
+  // Persists a depotId into the logged-in Assistant's own account record
+  // via linkDepotForAssistant, so their linked-depot list follows them
+  // across devices/logins instead of only living in this device's local
+  // DepotIndex cache. The function also refreshes the session pointer to
+  // match (Admin SDK) - the RTDB rule checks the session pointer, not the
+  // account record, so without that a newly linked depot would be denied
+  // until next login.
   async rememberDepotForAssistant(depotId){
     if(!this.isAssistant() || !depotId) return;
     this.session.depotIds[depotId] = true;
     this.saveLocalSession();
     if(!CloudSync.configured) return;
-    try{ await this._rtdb(`${SDM_USERS_NODE}/${this.session.userId}/depotIds/${depotId}.json`, 'PUT', true); }
-    catch(e){ console.warn('Assistant depot-list sync failed, kept locally:', e); }
-    // The RTDB rule checks the session pointer, not this account record -
-    // without this, a newly linked depot would be denied until next login.
-    await this._refreshServerSession();
+    try{
+      const result = await this._callFunction('linkDepotForAssistant', { depotId });
+      if(result && result.depotIds){ this.session.depotIds = result.depotIds; this.saveLocalSession(); }
+    }catch(e){ console.warn('Assistant depot-list sync failed, kept locally:', e); }
   },
   async forgetDepotForAssistant(depotId){
     if(!this.isAssistant() || !depotId) return;
     delete this.session.depotIds[depotId];
     this.saveLocalSession();
     if(!CloudSync.configured) return;
-    try{ await this._rtdb(`${SDM_USERS_NODE}/${this.session.userId}/depotIds/${depotId}.json`, 'DELETE'); }
-    catch(e){ console.warn('Assistant depot-list sync failed, kept locally:', e); }
-    await this._refreshServerSession();
+    try{
+      const result = await this._callFunction('unlinkDepotForAssistant', { depotId });
+      if(result && result.depotIds){ this.session.depotIds = result.depotIds; this.saveLocalSession(); }
+    }catch(e){ console.warn('Assistant depot-list sync failed, kept locally:', e); }
+  },
+
+  // Lists the CLERK accounts pointing at a given depot, for the "Transfer
+  // Clerk" card below - only ever called for depots already in the
+  // Assistant's own depotIds, but listClerksInDepot re-checks that
+  // server-side anyway (never trust the client-side gate alone).
+  async listClerksInDepot(depotId){
+    if(!this.isAssistant() || !depotId || !CloudSync.configured) return [];
+    try{
+      const result = await this._callFunction('listClerksInDepot', { depotId });
+      return (result && result.clerks) || [];
+    }catch(e){ console.warn('listClerksInDepot failed:', e); return []; }
+  },
+
+  // Moves a clerk's single depotId to a different depot the Assistant
+  // also oversees. transferClerkToDepot enforces the oversight check on
+  // both the old and new depot server-side - this is just the fetch call.
+  async transferClerk(clerkUserId, newDepotId){
+    if(!this.isAssistant()) throw new Error('Only Marketing Assistants can transfer clerks.');
+    return await this._callFunction('transferClerkToDepot', { clerkUserId, newDepotId });
   },
 
   logout(){
@@ -3707,7 +3704,79 @@ async function renderDepotSwitcher(){
       renderDepotSwitcher();
     });
   });
+
+  renderTransferClerkCard(entries);
 }
+
+/* ---- Transfer Clerk card: lets a Marketing Assistant move a clerk from
+   the currently-active depot to any other depot in their own list, via
+   the transferClerkToDepot Cloud Function. Only ever shown for the
+   ASSISTANT role (multiDepotCards is hidden entirely for CLERK). ---- */
+async function renderTransferClerkCard(depotEntries){
+  const status = document.getElementById('transferClerkStatus');
+  const form = document.getElementById('transferClerkForm');
+  if(!status || !form) return;
+  if(!AppAuth.isAssistant() || !CloudSync.configured || !CloudSync.depotId){
+    status.textContent = 'Switch to a depot first to transfer its clerks.';
+    form.style.display = 'none';
+    return;
+  }
+
+  status.textContent = 'Loading clerks for this depot…';
+  form.style.display = 'none';
+
+  const [clerks, entries] = await Promise.all([
+    AppAuth.listClerksInDepot(CloudSync.depotId),
+    depotEntries ? Promise.resolve(depotEntries) : DepotIndex.listEntries()
+  ]);
+
+  if(!clerks.length){
+    status.textContent = 'No clerks are currently assigned to this depot.';
+    return;
+  }
+
+  const destIds = Object.keys(entries).filter(id=> id !== CloudSync.depotId);
+  if(!destIds.length){
+    status.textContent = 'Link another depot above before transferring clerks into it.';
+    return;
+  }
+
+  status.textContent = '';
+  form.style.display = '';
+  const clerkSelect = document.getElementById('transferClerkSelect');
+  const destSelect = document.getElementById('transferClerkDestSelect');
+  clerkSelect.innerHTML = clerks.map(c=>
+    `<option value="${escapeHtml(c.userId)}">${escapeHtml(c.name)} (${escapeHtml(c.username)})</option>`
+  ).join('');
+  destSelect.innerHTML = destIds.map(id=>
+    `<option value="${escapeHtml(id)}">${escapeHtml(entries[id].label || id)}</option>`
+  ).join('');
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  const btn = document.getElementById('transferClerkBtn');
+  if(!btn) return;
+  btn.addEventListener('click', async ()=>{
+    const clerkUserId = document.getElementById('transferClerkSelect').value;
+    const destSelect = document.getElementById('transferClerkDestSelect');
+    const newDepotId = destSelect.value;
+    const destLabel = destSelect.options[destSelect.selectedIndex]?.textContent || newDepotId;
+    if(!clerkUserId || !newDepotId) return;
+    if(!confirm(`Move this clerk to ${destLabel}? They'll see ${destLabel}'s data next time they open the app.`)) return;
+    btn.disabled = true;
+    btn.textContent = 'Transferring…';
+    try{
+      await AppAuth.transferClerk(clerkUserId, newDepotId);
+      await renderTransferClerkCard();
+      alert('Clerk transferred.');
+    }catch(e){
+      alert('Could not transfer clerk: ' + (e.message || 'please try again.'));
+    }finally{
+      btn.disabled = false;
+      btn.textContent = 'Transfer';
+    }
+  });
+});
 
 // Swaps the active depot through the existing sync mutex - reuses
 // pullFromCloud exactly as the manual "Link" flow does, except with
@@ -4021,11 +4090,21 @@ async function bootAfterAuth(){
   }
   initAll();
   applyRoleUI();
-  // Covers the restored-session fast path too (loadLocalSession skips
-  // login/signup entirely), and must finish before the depot pull below -
-  // otherwise the pull can race the pointer write and get denied by the
-  // rule even though this session is legitimately allowed.
-  await AppAuth._refreshServerSession();
+  // Previously awaited AppAuth._refreshServerSession() here to cover the
+  // restored-session fast path (loadLocalSession skips login/signup
+  // entirely, so nothing else would refresh the pointer for it). Removed
+  // under PHASE 13: satDepotManagerSessions is client deny-all now, so
+  // that write would just be denied. In the normal case this is harmless -
+  // the same device's anonymous UID already has a valid pointer from its
+  // last real login/signup, written server-side by sdmLogin/sdmSignup.
+  // Known edge case: if a device's local session survives while its
+  // Firebase Auth anonymous credential is reset (not a same-device reload,
+  // but e.g. a manually restored localStorage backup onto a fresh
+  // install), that new UID has no matching pointer and depot reads will
+  // come back permission-denied (surfaced as CloudSync.status = 'denied')
+  // until the user logs in again - logging in re-establishes it via
+  // sdmLogin. Rare enough in practice not to warrant a dedicated
+  // refresh-session Cloud Function for now.
   if(CloudSync.depotId) await CloudSync.pullFromCloud(false);
   if(typeof renderDepotSwitcher === 'function') renderDepotSwitcher();
 }
