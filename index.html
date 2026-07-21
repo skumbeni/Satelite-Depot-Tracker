@@ -327,8 +327,58 @@
     .stat{padding:8px 6px;}
     .row2,.row3,.row4{gap:8px;}
   }
+
+  /* ── PHASE 10 — Login / role gate ── */
+  .auth-gate{
+    position:fixed; inset:0; z-index:3000; display:none;
+    background: linear-gradient(160deg, #78350F 0%, #92400E 30%, #B45309 60%, #EAB308 100%);
+    color:#fff; overflow-y:auto;
+  }
+  .auth-gate.show{ display:flex; align-items:flex-start; justify-content:center; }
+  .auth-card{
+    width:100%; max-width:380px; margin:36px 16px; background:#fff; color:var(--ink,#2E2A24);
+    border-radius:14px; padding:22px 18px 18px; box-shadow:0 12px 30px rgba(0,0,0,.35);
+  }
+  .auth-card h2{ margin:0 0 4px; font-size:19px; }
+  .auth-card .auth-sub{ color:var(--muted,#8a8378); font-size:12.5px; margin-bottom:16px; }
+  .auth-card label{ display:block; font-size:12px; font-weight:700; margin:10px 0 4px; }
+  .auth-card input, .auth-card select{
+    width:100%; padding:9px 10px; border:1px solid var(--line,#e5ddd0); border-radius:8px; font-size:14px; box-sizing:border-box;
+  }
+  .auth-role-toggle{ display:flex; gap:8px; margin-top:12px; }
+  .auth-role-toggle button{
+    flex:1; padding:10px 6px; border:1px solid var(--line,#e5ddd0); border-radius:8px; background:#fff;
+    font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .auth-role-toggle button.active{ background:var(--amber-deeper,#78350F); color:#fff; border-color:var(--amber-deeper,#78350F); }
+  .auth-card .auth-primary-btn{
+    width:100%; margin-top:16px; padding:11px; border:none; border-radius:8px;
+    background:var(--gold,#EAB308); color:#2E2A24; font-weight:700; font-size:14px; cursor:pointer;
+  }
+  .auth-card .auth-switch{ text-align:center; margin-top:12px; font-size:12.5px; }
+  .auth-card .auth-switch a{ color:var(--amber-deeper,#78350F); font-weight:700; cursor:pointer; text-decoration:underline; }
+  .auth-error{ background:#FEE2E2; color:#991B1B; font-size:12px; padding:8px 10px; border-radius:8px; margin-top:10px; display:none; }
+  .auth-error.show{ display:block; }
+
+  /* ── View-only lock (Marketing Assistant browsing another depot) ── */
+  .view-lock-banner{
+    display:none; align-items:center; justify-content:space-between; gap:10px;
+    background:#78350F; color:#fff; padding:10px 14px; font-size:12.5px; font-weight:600;
+  }
+  .view-lock-banner.show{ display:flex; }
+  .view-lock-banner button{
+    background:var(--gold,#EAB308); color:#2E2A24; border:none; border-radius:6px;
+    padding:7px 12px; font-weight:700; font-size:12px; cursor:pointer; flex-shrink:0;
+  }
+  body.editing-locked .tabpanel input,
+  body.editing-locked .tabpanel select,
+  body.editing-locked .tabpanel textarea,
+  body.editing-locked .tabpanel button{
+    pointer-events:none !important; opacity:.5 !important;
+  }
 </style>
 </head>
+
 <body>
 
 <!-- ════════ LANDING / SPLASH PAGE ════════ -->
@@ -375,6 +425,47 @@
 </div>
 <!-- ════════ END SPLASH ════════ -->
 
+<!-- ════════ AUTH GATE (login / sign up) ════════ -->
+<div class="auth-gate" id="authGate">
+  <div class="auth-card">
+    <div id="authLoginForm">
+      <h2>Sign in</h2>
+      <div class="auth-sub">Satellite Depot Manager</div>
+      <label>Username</label>
+      <input type="text" id="authLoginUsername" autocomplete="username" autocapitalize="off">
+      <label>Password</label>
+      <input type="password" id="authLoginPassword" autocomplete="current-password">
+      <div class="auth-error" id="authLoginError"></div>
+      <button class="auth-primary-btn" type="button" id="authLoginBtn">Sign in</button>
+      <div class="auth-switch">No account? <a id="authGoToSignup">Create one</a></div>
+    </div>
+    <div id="authSignupForm" style="display:none;">
+      <h2>Create account</h2>
+      <div class="auth-sub">Tell us which role you'll be using this app as</div>
+      <div class="auth-role-toggle">
+        <button type="button" class="active" id="authRoleClerkBtn" data-role="CLERK">Depot Clerk</button>
+        <button type="button" id="authRoleAssistantBtn" data-role="ASSISTANT">Marketing Assistant</button>
+      </div>
+      <label>Your name</label>
+      <input type="text" id="authSignupName">
+      <label>Username</label>
+      <input type="text" id="authSignupUsername" autocomplete="username" autocapitalize="off">
+      <label>Password (min 6 characters)</label>
+      <input type="password" id="authSignupPassword" autocomplete="new-password">
+      <label>Confirm password</label>
+      <input type="password" id="authSignupPassword2" autocomplete="new-password">
+      <div id="authSignupDepotWrap">
+        <label>Depot code (given to you by your depot)</label>
+        <input type="text" id="authSignupDepotCode" placeholder="e.g. SD-7K3P9Q" style="text-transform:uppercase;">
+      </div>
+      <div class="auth-error" id="authSignupError"></div>
+      <button class="auth-primary-btn" type="button" id="authSignupBtn">Create account</button>
+      <div class="auth-switch">Already have an account? <a id="authGoToLogin">Sign in</a></div>
+    </div>
+  </div>
+</div>
+<!-- ════════ END AUTH GATE ════════ -->
+
 <div class="brandbar">
   <div class="top">
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="Open menu" aria-expanded="false">
@@ -387,6 +478,11 @@
     </div>
     <div class="datestamp" id="todayStamp">15 Jul 2026</div>
   </div>
+</div>
+
+<div class="view-lock-banner" id="viewLockBanner">
+  <span>Viewing this depot read-only</span>
+  <button type="button" id="unlockEditingBtn">Enable editing</button>
 </div>
 
 <div class="drawer-overlay" id="drawerOverlay"></div>
@@ -412,6 +508,7 @@
   <button data-tab="payroll" class=""><span class="di">💵</span>Payroll</button>
   <button data-tab="reports" class=""><span class="di">📋</span>Reports</button>
   <button data-tab="settings" class="active"><span class="di">⚙️</span>Settings</button>
+  <button type="button" id="logoutBtn" style="margin-top:auto; color:var(--rust,#b91c1c);"><span class="di">🚪</span>Log out</button>
 </nav>
 
 <div class="container" style="margin-top:14px;">
@@ -759,7 +856,7 @@
         <p class="muted" style="margin-top:2px;">Enter this code on another device's Settings to see this same depot's data there.</p>
         <button class="btn" type="button" id="unlinkDepotBtn" style="margin-top:8px;">Unlink this device</button>
       </div>
-      <div id="cloudSyncUnlinked" style="display: none;">
+      <div id="cloudSyncUnlinked" style="display: none;" data-clerk-hide="true">
         <label>Have a depot code from another device?</label>
         <div class="row2">
           <input type="text" id="depotCodeInput" placeholder="e.g. SD-7K3P9Q" style="text-transform:uppercase;">
@@ -769,6 +866,7 @@
         <button class="btn btn-block" type="button" id="createDepotBtn">Create new cloud depot</button>
       </div>
     </div>
+    <div id="multiDepotCards">
     <div class="card">
       <h2>My Depots <span class="sub">switch between depots you manage</span></h2>
       <div id="depotSwitcherList" class="muted"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);">
@@ -804,6 +902,7 @@
       <h2>Combined Totals <span class="sub">read-only roll-up across all your depots</span></h2>
       <button class="btn btn-block" type="button" id="loadRollupBtn">Load combined totals</button>
       <div id="depotRollupView" style="display:none;margin-top:10px;"></div>
+    </div>
     </div>
     <div class="card">
       <h2>Edit Stock <span class="sub">manually adjust grain &amp; equipment balances</span></h2>
@@ -876,7 +975,7 @@
 // registration URL below, so the service worker cache name always tracks
 // this single constant — no need to hand-edit a separate CACHE_NAME in
 // sw.js and risk the two drifting out of sync.
-const APP_VER = 'v1.1.0';
+const APP_VER = 'v1.1.0'; // bumped: Phase 10 login/role gate shipped
 const STORAGE_KEY = 'fraDepotData_v3';
 const CROPS = ['Maize','Soyabeans','Rice'];
 const DEFAULT_EQUIPMENT = ['Bags','Twine','Sieves','Tents','Scales'];
@@ -1418,9 +1517,222 @@ const CloudSync = {
   }
 };
 
-// Durable retry sweep: catches a failed push that happened while the app
-// was backgrounded/offline, even if the 'online' event never fires (flaky
-// mobile connections don't always trigger it cleanly).
+/* ===================== PHASE 10 — APP AUTH (username/password + roles) =====================
+   Adds a real login on top of the depot-code-as-shared-secret model above.
+   Two roles:
+     CLERK     - locked to exactly one depot (the one they signed up against).
+                 Depot switcher/link/create UI is hidden for this role.
+     ASSISTANT - can be linked to many depots (via the existing DepotIndex/
+                 depot-switcher UI from Phase 9), and browses each one
+                 read-only by default (see enforceViewOnlyUI below) with an
+                 explicit "Enable editing" unlock per depot per session.
+
+   Storage: a new top-level RTDB node, `satDepotManagerUsers`, additive to
+   everything above - same shared-Firebase-project pattern as satDepotManager
+   itself. Schema per user record:
+     { name, username, password, role: 'CLERK'|'ASSISTANT',
+       depotId (CLERK only), depotIds: {[depotId]: true} (ASSISTANT only),
+       createdAt }
+
+   NOTE ON SECURITY: passwords are stored and compared in plain text here,
+   matching the pattern already deployed for the sibling SDC app's `users`
+   node (same tradeoff that doc block above calls out: fine for trusted
+   small operators, not a hardened boundary). If this ever needs to survive
+   a hostile network or a leaked database dump, swap to hashed passwords
+   and move the check into a Cloud Function - out of scope for this pass.
+
+   Server-side enforcement: because CloudSync's Firebase Auth is anonymous
+   (a fresh UID per device/reinstall, not tied to the username/password),
+   real enforcement needs a session pointer keyed by that anonymous UID -
+   see `satDepotManagerSessions/{auth.uid}` below, refreshed on every
+   login. Suggested RTDB rules to deploy alongside this (extends the
+   draft in the CLOUD SYNC comment above):
+
+     "satDepotManagerUsers": {
+       ".read": "auth != null",
+       ".indexOn": ["username"],
+       "$id": {
+         ".write": "auth != null",
+         ".validate": "newData.hasChildren(['username','password','name','role']) && newData.child('username').isString() && newData.child('username').val().length > 0 && newData.child('password').isString() && newData.child('password').val().length >= 6 && ((newData.child('role').val() == 'CLERK' && newData.hasChild('depotId')) || (newData.child('role').val() == 'ASSISTANT'))"
+       }
+     },
+     "satDepotManagerSessions": {
+       "$uid": {
+         ".read": "auth != null && auth.uid == $uid",
+         ".write": "auth != null && auth.uid == $uid"
+       }
+     }
+
+   Until that's deployed, `satDepotManager/$depotId` write access is still
+   the simpler "any authed session, any depotId" rule from Phase 7 - this
+   phase adds the client-side login/role UX; tightening the depot-data
+   write rule to actually check the session pointer is a follow-up. */
+const SDM_USERS_NODE = 'satDepotManagerUsers';
+const SDM_SESSIONS_NODE = 'satDepotManagerSessions';
+const SDM_SESSION_KEY = 'sdmSession_v1';
+
+const AppAuth = {
+  session: null, // { userId, username, name, role, depotId, depotIds }
+
+  loadLocalSession(){
+    try{ this.session = JSON.parse(localStorage.getItem(SDM_SESSION_KEY) || 'null'); }
+    catch(e){ this.session = null; }
+    return this.session;
+  },
+  saveLocalSession(){ localStorage.setItem(SDM_SESSION_KEY, JSON.stringify(this.session)); },
+  clearLocalSession(){ this.session = null; localStorage.removeItem(SDM_SESSION_KEY); },
+
+  isAssistant(){ return !!this.session && this.session.role === 'ASSISTANT'; },
+  isClerk(){ return !!this.session && this.session.role === 'CLERK'; },
+
+  // Small standalone fetch helper (separate from CloudSync._request since
+  // this needs RTDB query params, not just a plain path) - same timeout/
+  // retry budget as the rest of the app for consistency on weak 4G.
+  async _rtdb(pathWithQuery, method, body){
+    const budget = networkBudget();
+    const token = await CloudSync._authToken();
+    const base = FIREBASE_CONFIG.databaseURL.replace(/\/$/, '');
+    const sep = pathWithQuery.includes('?') ? '&' : '?';
+    const url = `${base}/${pathWithQuery}${sep}${token ? 'auth='+token : ''}`;
+    let attempt = 0;
+    for(;;){
+      const controller = new AbortController();
+      const timer = setTimeout(()=> controller.abort(), budget.timeoutMs);
+      try{
+        const opts = { method, signal: controller.signal };
+        if(body !== undefined) opts.body = JSON.stringify(body);
+        const res = await fetch(url, opts);
+        clearTimeout(timer);
+        if(!res.ok) throw Object.assign(new Error('RTDB '+method+' failed: '+res.status), { retryable: res.status >= 500 });
+        return res.status === 204 ? null : res.json();
+      }catch(e){
+        clearTimeout(timer);
+        const retryable = e.name === 'AbortError' || e.retryable !== false;
+        if(!retryable || attempt >= budget.retries) throw e;
+        attempt++;
+        await new Promise(r=> setTimeout(r, Math.min(800*2**(attempt-1), 2500)));
+      }
+    }
+  },
+
+  async _findByUsername(username){
+    const q = `${SDM_USERS_NODE}.json?orderBy=${encodeURIComponent('"username"')}&equalTo=${encodeURIComponent('"'+username+'"')}`;
+    const result = await this._rtdb(q, 'GET');
+    if(!result) return null;
+    const id = Object.keys(result)[0];
+    return { id, ...result[id] };
+  },
+
+  async login(username, password){
+    username = (username||'').trim();
+    if(!username || !password) throw new Error('Enter your username and password.');
+    const user = await this._findByUsername(username);
+    if(!user || user.deleted) throw new Error('No account found with that username.');
+    if(user.password !== password) throw new Error('Incorrect password.');
+    this.session = {
+      userId: user.id, username: user.username, name: user.name, role: user.role,
+      depotId: user.depotId || null,
+      depotIds: user.depotIds || {}
+    };
+    this.saveLocalSession();
+    await this._refreshServerSession();
+    return this.session;
+  },
+
+  async signup({ name, username, password, role, depotCode }){
+    name = (name||'').trim(); username = (username||'').trim();
+    if(!name || !username || !password) throw new Error('Fill in all fields.');
+    if(password.length < 6) throw new Error('Password must be at least 6 characters.');
+    if(role === 'CLERK' && !(depotCode||'').trim()) throw new Error('Enter the depot code your depot uses.');
+    const existing = await this._findByUsername(username);
+    if(existing && !existing.deleted) throw new Error('That username is already taken.');
+
+    const record = { name, username, password, role, createdAt: Date.now() };
+    if(role === 'CLERK') record.depotId = depotCode.trim().toUpperCase();
+    else record.depotIds = {};
+
+    const created = await this._rtdb(SDM_USERS_NODE + '.json', 'POST', record);
+    this.session = {
+      userId: created.name, username, name, role,
+      depotId: record.depotId || null,
+      depotIds: record.depotIds || {}
+    };
+    this.saveLocalSession();
+    await this._refreshServerSession();
+    return this.session;
+  },
+
+  // Ties the current device's anonymous Firebase-Auth UID to this account,
+  // so RTDB rules (once tightened per the comment above) can check "does
+  // this UID's session say it may write to this depotId" without needing
+  // real Firebase Auth accounts.
+  async _refreshServerSession(){
+    if(!CloudSync.configured || !this.session) return;
+    try{
+      const user = await CloudSync.authReady;
+      if(!user) return;
+      await this._rtdb(`${SDM_SESSIONS_NODE}/${user.uid}.json`, 'PUT', {
+        userId: this.session.userId, role: this.session.role,
+        depotId: this.session.depotId, depotIds: this.session.depotIds,
+        loggedInAt: Date.now()
+      });
+    }catch(e){ console.warn('Session pointer sync failed (login still works locally):', e); }
+  },
+
+  // Persists a depotId into the logged-in Assistant's own account record,
+  // so their linked-depot list follows them across devices/logins instead
+  // of only living in this device's local DepotIndex cache.
+  async rememberDepotForAssistant(depotId){
+    if(!this.isAssistant() || !depotId) return;
+    this.session.depotIds[depotId] = true;
+    this.saveLocalSession();
+    if(!CloudSync.configured) return;
+    try{ await this._rtdb(`${SDM_USERS_NODE}/${this.session.userId}/depotIds/${depotId}.json`, 'PUT', true); }
+    catch(e){ console.warn('Assistant depot-list sync failed, kept locally:', e); }
+  },
+  async forgetDepotForAssistant(depotId){
+    if(!this.isAssistant() || !depotId) return;
+    delete this.session.depotIds[depotId];
+    this.saveLocalSession();
+    if(!CloudSync.configured) return;
+    try{ await this._rtdb(`${SDM_USERS_NODE}/${this.session.userId}/depotIds/${depotId}.json`, 'DELETE'); }
+    catch(e){ console.warn('Assistant depot-list sync failed, kept locally:', e); }
+  },
+
+  logout(){
+    this.clearLocalSession();
+    document.body.classList.remove('editing-locked');
+    window.location.reload(); // simplest clean-slate reset back to the login gate
+  }
+};
+
+// ---- View-only enforcement for the Assistant role -------------------
+// Assistants land on each depot read-only by default (they're most often
+// checking a clerk's figures, not editing them); one tap unlocks editing
+// for the rest of this browsing session on the currently active depot.
+// Clerks never get locked - it's their own single depot.
+let _editingUnlockedFor = null; // depotId currently unlocked, or null
+function applyViewOnlyForCurrentDepot(){
+  const banner = document.getElementById('viewLockBanner');
+  if(!AppAuth.isAssistant()){
+    document.body.classList.remove('editing-locked');
+    if(banner) banner.classList.remove('show');
+    return;
+  }
+  const locked = _editingUnlockedFor !== CloudSync.depotId;
+  document.body.classList.toggle('editing-locked', locked);
+  if(banner) banner.classList.toggle('show', locked);
+}
+document.addEventListener('DOMContentLoaded', ()=>{
+  const unlockBtn = document.getElementById('unlockEditingBtn');
+  if(unlockBtn) unlockBtn.addEventListener('click', ()=>{
+    _editingUnlockedFor = CloudSync.depotId;
+    applyViewOnlyForCurrentDepot();
+    toast('Editing enabled for this depot');
+  });
+});
+
+
 if(typeof window !== 'undefined'){
   window.addEventListener('online', ()=>{
     if(CloudSync.depotId && CloudSync.hasDirty()) CloudSync.pushToCloud();
@@ -3273,6 +3585,7 @@ async function renderDepotSwitcher(){
       const id = btn.getAttribute('data-remove-depot');
       if(!confirm('Remove ' + id + " from your list?\n\nThe depot's own data is not deleted - only its entry in your list.")) return;
       await DepotIndex.removeEntry(id);
+      await AppAuth.forgetDepotForAssistant(id);
       renderDepotSwitcher();
     });
   });
@@ -3317,6 +3630,7 @@ async function switchActiveDepot(depotId){
 
   await CloudSync.pullFromCloud(false); // reconciles with the network when available; no-ops gracefully offline
   renderDepotSwitcher();
+  applyViewOnlyForCurrentDepot(); // each depot starts locked again for the Assistant role
   if(paintedFromCache || navigator.onLine) toast('Switched to ' + depotId);
 }
 
@@ -3418,6 +3732,8 @@ document.getElementById('linkDepotBtn').addEventListener('click', ()=>{
   renderCloudSyncCard();
   CloudSync.pullFromCloud(true); // true = confirm before migrating local data if the code is empty
   DepotIndex.addEntry(code, DB.settings.depotName).then(renderDepotSwitcher); // register in this manager's list too
+  AppAuth.rememberDepotForAssistant(code);
+  applyViewOnlyForCurrentDepot();
   toast('Linking to depot ' + code + '…');
 });
 
@@ -3428,6 +3744,8 @@ document.getElementById('createDepotBtn').addEventListener('click', ()=>{
   renderCloudSyncCard();
   CloudSync.pushToCloud(); // seed the cloud with this device's current data
   DepotIndex.addEntry(code, DB.settings.depotName).then(renderDepotSwitcher); // register in this manager's list too
+  AppAuth.rememberDepotForAssistant(code);
+  applyViewOnlyForCurrentDepot();
   toast('Cloud depot created: ' + code);
 });
 
@@ -3437,6 +3755,7 @@ document.getElementById('addDepotIndexBtn').addEventListener('click', async ()=>
   if(!code){ toast('Enter a depot code first'); return; }
   if(!CloudSync.configured){ toast('Cloud sync is not set up yet on this app'); return; }
   await DepotIndex.addEntry(code, label);
+  await AppAuth.rememberDepotForAssistant(code);
   document.getElementById('addDepotIndexCode').value = '';
   document.getElementById('addDepotIndexLabel').value = '';
   renderDepotSwitcher();
@@ -3541,8 +3860,146 @@ function initAll(){
   renderStaffTab();
   renderSettings();
 }
-initAll();
-CloudSync.init(); // local UI paints first (above), cloud sync catches up async
+
+/* ── PHASE 10 — role-based UI restrictions ──
+   CLERK: locked to one depot, so the multi-depot switcher/roll-up and the
+   "link/create a different cloud depot" controls don't apply to them. */
+function applyRoleUI(){
+  const multi = document.getElementById('multiDepotCards');
+  const clerkHide = document.querySelectorAll('[data-clerk-hide]');
+  if(AppAuth.isClerk()){
+    if(multi) multi.style.display = 'none';
+    clerkHide.forEach(el=> el.style.display = 'none');
+  } else {
+    if(multi) multi.style.display = '';
+    // cloudSyncUnlinked's own show/hide logic (linked vs unlinked) still
+    // governs visibility for non-clerks - just remove our override.
+    clerkHide.forEach(el=> el.style.removeProperty('display'));
+  }
+  applyViewOnlyForCurrentDepot();
+}
+
+// Runs once login/signup succeeds (or immediately, if a session was
+// already saved on this device from a previous visit).
+async function bootAfterAuth(){
+  document.getElementById('authGate').classList.remove('show');
+  if(AppAuth.isClerk() && AppAuth.session.depotId && CloudSync.depotId !== AppAuth.session.depotId){
+    CloudSync.setDepotId(AppAuth.session.depotId);
+  }
+  if(AppAuth.isAssistant()){
+    // Seed the local depot-switcher cache from this account's saved list,
+    // so a fresh device/login sees the same depots without needing them
+    // re-added by hand (merge, don't clobber, any local labels already there).
+    const cache = DepotIndex._cache();
+    Object.keys(AppAuth.session.depotIds || {}).forEach(id=>{
+      if(!cache[id]) cache[id] = { label: id, addedAt: Date.now() };
+    });
+    DepotIndex._saveCache(cache);
+  }
+  initAll();
+  applyRoleUI();
+  if(CloudSync.depotId) await CloudSync.pullFromCloud(false);
+  if(typeof renderDepotSwitcher === 'function') renderDepotSwitcher();
+}
+
+function bootApp(){
+  CloudSync.init(); // anonymous auth + cloud wiring start regardless of login state
+  if(!CloudSync.configured){
+    // No Firebase project configured - login has nothing to check against,
+    // so fall back to the original local-only, no-login behavior.
+    initAll();
+    return;
+  }
+  AppAuth.loadLocalSession();
+  if(AppAuth.session){
+    bootAfterAuth();
+  } else {
+    document.getElementById('authGate').classList.add('show');
+  }
+}
+
+/* ── Auth gate form wiring ── */
+(function(){
+  const gate = document.getElementById('authGate');
+  const loginForm = document.getElementById('authLoginForm');
+  const signupForm = document.getElementById('authSignupForm');
+  const loginErr = document.getElementById('authLoginError');
+  const signupErr = document.getElementById('authSignupError');
+  const depotWrap = document.getElementById('authSignupDepotWrap');
+  let signupRole = 'CLERK';
+
+  document.getElementById('authGoToSignup').addEventListener('click', ()=>{
+    loginForm.style.display = 'none'; signupForm.style.display = '';
+  });
+  document.getElementById('authGoToLogin').addEventListener('click', ()=>{
+    signupForm.style.display = 'none'; loginForm.style.display = '';
+  });
+
+  document.getElementById('authRoleClerkBtn').addEventListener('click', function(){
+    signupRole = 'CLERK';
+    this.classList.add('active');
+    document.getElementById('authRoleAssistantBtn').classList.remove('active');
+    depotWrap.style.display = '';
+  });
+  document.getElementById('authRoleAssistantBtn').addEventListener('click', function(){
+    signupRole = 'ASSISTANT';
+    this.classList.add('active');
+    document.getElementById('authRoleClerkBtn').classList.remove('active');
+    depotWrap.style.display = 'none';
+  });
+
+  document.getElementById('authLoginBtn').addEventListener('click', async ()=>{
+    loginErr.classList.remove('show');
+    const btn = document.getElementById('authLoginBtn');
+    btn.disabled = true; btn.textContent = 'Signing in…';
+    try{
+      await AppAuth.login(
+        document.getElementById('authLoginUsername').value,
+        document.getElementById('authLoginPassword').value
+      );
+      await bootAfterAuth();
+      toast('Welcome back, ' + AppAuth.session.name);
+    }catch(e){
+      loginErr.textContent = e.message || 'Sign in failed.';
+      loginErr.classList.add('show');
+    }
+    btn.disabled = false; btn.textContent = 'Sign in';
+  });
+
+  document.getElementById('authSignupBtn').addEventListener('click', async ()=>{
+    signupErr.classList.remove('show');
+    const pw = document.getElementById('authSignupPassword').value;
+    const pw2 = document.getElementById('authSignupPassword2').value;
+    if(pw !== pw2){
+      signupErr.textContent = 'Passwords do not match.';
+      signupErr.classList.add('show');
+      return;
+    }
+    const btn = document.getElementById('authSignupBtn');
+    btn.disabled = true; btn.textContent = 'Creating…';
+    try{
+      await AppAuth.signup({
+        name: document.getElementById('authSignupName').value,
+        username: document.getElementById('authSignupUsername').value,
+        password: pw,
+        role: signupRole,
+        depotCode: document.getElementById('authSignupDepotCode').value
+      });
+      await bootAfterAuth();
+      toast('Account created - welcome, ' + AppAuth.session.name);
+    }catch(e){
+      signupErr.textContent = e.message || 'Could not create account.';
+      signupErr.classList.add('show');
+    }
+    btn.disabled = false; btn.textContent = 'Create account';
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', ()=>{
+    if(confirm('Log out of this device?')) AppAuth.logout();
+  });
+})();
+
+bootApp();
 
 /* ===================== INSTALL APP (Add to Home Screen) =====================
    Two paths: Android/Chrome/Edge support beforeinstallprompt and can be
