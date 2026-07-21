@@ -1015,9 +1015,9 @@ const DEFAULT_PAY_RATE = 0;
    {
      "rules": {
        "satDepotManager": {
-         ".read": "auth != null",
          "$depotId": {
-           ".write": "auth != null",
+           ".read": "auth != null && (root.child('satDepotManagerSessions').child(auth.uid).child('depotId').val() == $depotId || root.child('satDepotManagerSessions').child(auth.uid).child('depotIds').child($depotId).exists())",
+           ".write": "auth != null && (root.child('satDepotManagerSessions').child(auth.uid).child('depotId').val() == $depotId || root.child('satDepotManagerSessions').child(auth.uid).child('depotIds').child($depotId).exists())",
            ".validate": "newData.hasChild('settings')"
          }
        },
@@ -1088,19 +1088,51 @@ const DEFAULT_PAY_RATE = 0;
      }
    }
 
-   Deployed version simplifies the draft above: no $depotId format check
-   on write (any depotId string an authed session sends is accepted, not
-   just ones shaped like generateDepotCode()'s output), and ".read" on
-   "satDepotManager" is open at the parent level rather than gated at
-   $depotId - meaning any anonymous session can list every depot code
-   that exists, not just read one it already knows. Combined with
-   depotId being a shared-secret code rather than a per-user identity
-   (same caveat SDC's own rules comment documents), this trades a bit of
-   guess-resistance for simplicity. Fine for trusted small operators
-   sharing a code with their own staff, not a hardened multi-tenant
-   boundary - tightening it later (parent-level .read back to false,
-   restoring the $depotId.matches() write guard) is a low-risk follow-up
-   whenever it's worth doing.
+   Deployed version simplifies the draft above in one respect only: no
+   $depotId format check on write (any depotId string an authed session
+   sends is accepted, not just ones shaped like generateDepotCode()'s
+   output). The isolation gap that used to exist here - parent-level
+   ".read" on "satDepotManager" open to any authed session, so one
+   Assistant's account could read or write another Assistant's/Clerk's
+   depot data just by knowing or guessing its depotId - is closed as of
+   PHASE 12 below: read and write on $depotId now both require the
+   caller's own session pointer (satDepotManagerSessions/{auth.uid}) to
+   list that depotId, either as its single depotId (CLERK) or inside
+   depotIds (ASSISTANT). depotId is still a shared *code* in the sense
+   that anyone who is validly linked to it (an Assistant who has added
+   it, or the Clerk it was issued to) can access it - this rule is about
+   stopping cross-account access, not about codes vs. identities.
+   ========================================================================= */
+
+/* ===================== PHASE 12 — PER-ACCOUNT DEPOT DATA ISOLATION =====================
+   Closes the follow-up flagged in PHASE 7 and PHASE 10: satDepotManager/
+   $depotId read/write now checks satDepotManagerSessions/{auth.uid}
+   (already uid-locked, already kept fresh by _refreshServerSession() on
+   every login/signup/link/unlink - see AppAuth below) instead of any
+   authed session. An Assistant or Clerk can now only reach depots their
+   own session pointer actually lists.
+
+   No app-code change needed - AppAuth already refreshes the session
+   pointer before every depot read (bootAfterAuth awaits
+   _refreshServerSession() before pullFromCloud, rememberDepotForAssistant/
+   forgetDepotForAssistant refresh it after every link/unlink) specifically
+   so it would never race a rule like this once deployed. This is a
+   Firebase console / rules-deploy change only - paste the updated
+   "satDepotManager" block above into Realtime Database > Rules and
+   publish; nothing in index.html or index.js needs to change for this
+   part.
+
+   Known remaining gap, left as-is for now: satDepotManagerUsers keeps
+   its parent-level ".read": "auth != null" (PHASE 10 above) because the
+   client's username-lookup query (_findByUsername, an orderByChild
+   query) needs root-level read to work at all. That means any logged-in
+   Assistant/Clerk can still list every other account's username, name,
+   role and depotId/depotIds (not their depot data - just the account
+   directory). Closing that fully means moving login/signup off direct
+   client RTDB calls onto the sdmLogin/sdmSignup Cloud Functions already
+   sitting in index.js (Admin SDK bypasses rules, so the rule could then
+   go back to deny-all) - a real client-code change, out of scope for
+   this pass unless wanted.
    ========================================================================= */
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBnfmuR0RNSPMMD77KNFrnw4_6aQgg0F74",
@@ -1595,10 +1627,10 @@ const CloudSync = {
    `password` field left, drop that branch of the OR and require the
    hash unconditionally.
 
-   Until that's deployed, `satDepotManager/$depotId` write access is still
+   Until PHASE 12 below, `satDepotManager/$depotId` write access was still
    the simpler "any authed session, any depotId" rule from Phase 7 - this
-   phase adds the client-side login/role UX; tightening the depot-data
-   write rule to actually check the session pointer is a follow-up. */
+   phase added the client-side login/role UX; PHASE 12 is the follow-up
+   that actually tightens the depot-data rule to check the session pointer. */
 const SDM_USERS_NODE = 'satDepotManagerUsers';
 const SDM_SESSIONS_NODE = 'satDepotManagerSessions';
 const SDM_SESSION_KEY = 'sdmSession_v1';
