@@ -889,6 +889,16 @@
         </div>
         <p class="muted" style="margin-top:4px;">Adds it to your list without switching to it now.</p>
       </div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);">
+        <label>Create a brand-new depot</label>
+        <input type="text" id="newDepotNameInput" placeholder="Depot name, e.g. Chembe Satellite Depot">
+        <div class="row2" style="margin-top:6px;">
+          <input type="text" id="newDepotDistrictInput" placeholder="District, e.g. Mwense">
+          <input type="text" id="newDepotProvinceInput" placeholder="Province, e.g. Luapula" value="Luapula">
+        </div>
+        <button class="btn btn-primary btn-block" type="button" id="createNewDepotBtn" style="margin-top:8px;">Create depot</button>
+        <p class="muted" style="margin-top:4px;">Adds a fresh, empty depot to your list - this device stays on the depot you're currently viewing.</p>
+      </div>
     </div>
     <div class="card">
       <h2>Combined Totals <span class="sub">read-only roll-up across all your depots</span></h2>
@@ -978,7 +988,7 @@
 // registration URL below, so the service worker cache name always tracks
 // this single constant — no need to hand-edit a separate CACHE_NAME in
 // sw.js and risk the two drifting out of sync.
-const APP_VER = 'v1.3.0'; // bumped: Marketing-Assistant "Transfer Clerk" screen, and depot codes now derived from province/district/depot name/MA username instead of pure-random
+const APP_VER = 'v1.4.0'; // bumped: "My Depots" now has a Create-a-new-depot form that adds a fresh depot to an Assistant's list without switching this device off the one they're currently on
 const STORAGE_KEY = 'fraDepotData_v3';
 const CROPS = ['Maize','Soyabeans','Rice'];
 const DEFAULT_EQUIPMENT = ['Bags','Twine','Sieves','Tents','Scales'];
@@ -1437,9 +1447,9 @@ const CloudSync = {
     return (letters + 'XXXX').slice(0, len);
   },
 
-  // Generates a depot code built from the depot's own province/district/
-  // name plus the creating Marketing Assistant's username, so the code
-  // is recognisable at a glance instead of a pure-random string - e.g.
+  // Generates a depot code built from a depot's province/district/name
+  // plus the creating Marketing Assistant's username, so the code is
+  // recognisable at a glance instead of a pure-random string - e.g.
   // province "Luapula", district "Mwense", depot name "Mutipula", MA
   // username "skumbeni" -> "LUA-MWE-MUT-SK7Q3M". The last segment still
   // ends with 4 random characters (same no-ambiguous-character alphabet
@@ -1447,15 +1457,48 @@ const CloudSync = {
   // rule requires already being linked to a code before it can be read,
   // so there's no way to check a candidate code's availability against
   // RTDB up front - randomness has to do that job instead of a lookup.
-  generateDepotCode(){
+  //
+  // Defaults to the currently-loaded DB.settings (the "Create new cloud
+  // depot" first-time-setup flow) - pass an explicit {province, district,
+  // depotName} to build a code for a *different* depot, e.g. one being
+  // created fresh via createRemoteDepot() below without disturbing this
+  // device's active depot.
+  generateDepotCode(fields){
+    const f = fields || DB.settings;
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let rand = '';
     for(let i=0;i<4;i++) rand += chars.charAt(Math.floor(Math.random()*chars.length));
-    const prov = this._codeFragment(DB.settings.province, 3);
-    const dist = this._codeFragment(DB.settings.district, 3);
-    const name = this._codeFragment(DB.settings.depotName, 3);
+    const prov = this._codeFragment(f.province, 3);
+    const dist = this._codeFragment(f.district, 3);
+    const name = this._codeFragment(f.depotName, 3);
     const ma = this._codeFragment(AppAuth.session && AppAuth.session.username, 2);
     return `${prov}-${dist}-${name}-${ma}${rand}`;
+  },
+
+  // Creates a brand-new, empty depot directly in the cloud and adds it to
+  // the calling Assistant's own depot list - deliberately does NOT touch
+  // this.depotId, the local DB, or localStorage, so the device stays on
+  // whichever depot is currently active. This is the "add another depot
+  // without leaving the one I'm on" counterpart to createDepotBtn's
+  // first-time-setup flow, which pushes the *current* DB and switches
+  // this device to it - reusing that flow here would clone whatever
+  // depot is currently loaded into the brand-new one, which is wrong.
+  //
+  // Order matters: rememberDepotForAssistant() must land before the
+  // write below - satDepotManager/$depotId's rule only allows a write
+  // once the caller's session already lists this depotId, and a session
+  // pointer can only change via that Cloud Function now (PHASE 13).
+  async createRemoteDepot({ depotName, district, province, label }){
+    if(!this.configured) throw new Error('Cloud sync is not set up yet on this app.');
+    const code = this.generateDepotCode({ depotName, district, province });
+    await AppAuth.rememberDepotForAssistant(code);
+    const blob = defaultDB();
+    blob.settings.depotName = (depotName||'').trim();
+    blob.settings.district = (district||'').trim();
+    blob.settings.province = (province||'').trim() || 'Luapula';
+    await this._request('satDepotManager/'+code, 'PUT', blob);
+    await DepotIndex.addEntry(code, label || blob.settings.depotName || code);
+    return code;
   },
 
   setDepotId(id){
@@ -3952,6 +3995,30 @@ document.getElementById('addDepotIndexBtn').addEventListener('click', async ()=>
   document.getElementById('addDepotIndexLabel').value = '';
   renderDepotSwitcher();
   toast('Added ' + code + ' to your list');
+});
+
+document.getElementById('createNewDepotBtn').addEventListener('click', async ()=>{
+  const depotName = document.getElementById('newDepotNameInput').value.trim();
+  const district = document.getElementById('newDepotDistrictInput').value.trim();
+  const province = document.getElementById('newDepotProvinceInput').value.trim();
+  if(!depotName){ toast('Enter the new depot\'s name first'); return; }
+  if(!CloudSync.configured){ toast('Cloud sync is not set up yet on this app'); return; }
+  const btn = document.getElementById('createNewDepotBtn');
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+  try{
+    const code = await CloudSync.createRemoteDepot({ depotName, district, province });
+    document.getElementById('newDepotNameInput').value = '';
+    document.getElementById('newDepotDistrictInput').value = '';
+    document.getElementById('newDepotProvinceInput').value = 'Luapula';
+    renderDepotSwitcher();
+    toast('Created depot ' + code + ' - switch to it above whenever you\'re ready');
+  }catch(e){
+    toast('Could not create depot: ' + (e.message || 'please try again.'));
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Create depot';
+  }
 });
 
 document.getElementById('unlinkDepotBtn').addEventListener('click', ()=>{
