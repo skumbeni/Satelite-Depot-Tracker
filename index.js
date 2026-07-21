@@ -327,7 +327,7 @@ exports.sdmSignup = onCall(async (request) => {
       "Anonymous sign-in must complete before signing up."
     );
   }
-  const { name, username, password, role, depotCode } = request.data || {};
+  const { name, username, password, role, depotCode, email } = request.data || {};
 
   if (!name || !username || !password || !role) {
     throw new HttpsError(
@@ -346,6 +346,10 @@ exports.sdmSignup = onCall(async (request) => {
   }
   if (role === "CLERK" && !(depotCode || "").trim()) {
     throw new HttpsError("invalid-argument", "Enter the depot code your depot uses.");
+  }
+  const normalizedEmail = (email || "").trim().toLowerCase();
+  if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    throw new HttpsError("invalid-argument", "That doesn't look like a valid email address.");
   }
 
   const existingSnap = await db
@@ -373,6 +377,7 @@ exports.sdmSignup = onCall(async (request) => {
   };
   if (role === "CLERK") record.depotId = depotCode.trim().toUpperCase();
   else record.depotIds = {};
+  if (normalizedEmail) record.email = normalizedEmail;
 
   const newRef = await db.ref("satDepotManagerUsers").push(record);
 
@@ -618,4 +623,83 @@ exports.listClerksInDepot = onCall(async (request) => {
     });
   }
   return { clerks };
+});
+
+/* ==================================================================== */
+/* 9. sdmSetRecoveryEmail                                               */
+/*    Lets a logged-in user add or change the recovery email on their   */
+/*    own account. Uses the same session-pointer resolution as the      */
+/*    depot-linking functions above - never trusts a client-supplied    */
+/*    userId, so nobody can set the email on someone else's account.    */
+/* ==================================================================== */
+exports.sdmSetRecoveryEmail = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in to set a recovery email.");
+  }
+  const { email } = request.data || {};
+  const normalizedEmail = (email || "").trim().toLowerCase();
+  if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    throw new HttpsError("invalid-argument", "Enter a valid email address.");
+  }
+
+  const { userId } = await sdmResolveCallerAccount(request.auth.uid);
+  await db.ref(`satDepotManagerUsers/${userId}`).update({ email: normalizedEmail });
+
+  return { email: normalizedEmail };
+});
+
+/* ==================================================================== */
+/* 10. sdmResetPasswordWithEmail                                        */
+/*     Looks up an account by username, and if the recovery email        */
+/*     submitted matches the one on file (case-insensitive), sets the    */
+/*     new password directly - no emailed code involved. Simpler, but     */
+/*     note the tradeoff: anyone who knows both the username and the      */
+/*     recovery email can reset that account's password, since nothing   */
+/*     proves the caller actually owns that inbox. Acceptable for a       */
+/*     small internal-team tool; revisit if that stops being true.       */
+/*     Returns the same "no match" error whether the username or the     */
+/*     email was wrong, so this can't be used to check which usernames    */
+/*     exist or which email is on file for one.                          */
+/* ==================================================================== */
+exports.sdmResetPasswordWithEmail = onCall(async (request) => {
+  const { username, recoveryEmail, newPassword } = request.data || {};
+  const uname = (username || "").trim();
+  const email = (recoveryEmail || "").trim().toLowerCase();
+  if (!uname || !email || !newPassword) {
+    throw new HttpsError("invalid-argument", "username, recoveryEmail and newPassword are required.");
+  }
+  if (typeof newPassword !== "string" || newPassword.length < 6) {
+    throw new HttpsError("invalid-argument", "Password must be at least 6 characters.");
+  }
+
+  const snap = await db
+    .ref("satDepotManagerUsers")
+    .orderByChild("username")
+    .equalTo(uname)
+    .limitToFirst(1)
+    .get();
+
+  const noMatch = () => new HttpsError("not-found", "Username and recovery email don't match our records.");
+  if (!snap.exists()) throw noMatch();
+  const [userId, user] = Object.entries(snap.val())[0];
+  if (user.deleted || !user.email || user.email !== email) throw noMatch();
+
+  const salt = sdmRandomSaltHex();
+  const passwordHash = sdmHashPassword(newPassword, salt);
+  await db.ref(`satDepotManagerUsers/${userId}`).update({ passwordHash, salt });
+
+  // Password changed - log every device out so a device left signed in
+  // elsewhere doesn't keep riding the old session.
+  const sessionsSnap = await db
+    .ref("satDepotManagerSessions")
+    .orderByChild("userId")
+    .equalTo(userId)
+    .get();
+  if (sessionsSnap.exists()) {
+    const removals = {};
+    sessionsSnap.forEach((child) => { removals[child.key] = null; });
+    await db.ref("satDepotManagerSessions").update(removals);
+  }
+
+  return { status: "reset" };
 });

@@ -360,6 +360,33 @@
   .auth-error{ background:#FEE2E2; color:#991B1B; font-size:12px; padding:8px 10px; border-radius:8px; margin-top:10px; display:none; }
   .auth-error.show{ display:block; }
 
+  /* ── ScreenLock — PIN re-entry after idle timeout ── */
+  .lock-gate{
+    position:fixed; inset:0; z-index:3500; display:none;
+    background: linear-gradient(160deg, #78350F 0%, #92400E 30%, #B45309 60%, #EAB308 100%);
+    color:#fff; align-items:center; justify-content:center; flex-direction:column;
+  }
+  .lock-gate.show{ display:flex; }
+  .lock-card{
+    width:100%; max-width:320px; margin:16px; background:#fff; color:var(--ink,#2E2A24);
+    border-radius:14px; padding:26px 20px 20px; box-shadow:0 12px 30px rgba(0,0,0,.35); text-align:center;
+  }
+  .lock-card h2{ margin:0 0 4px; font-size:18px; }
+  .lock-card .lock-sub{ color:var(--muted,#8a8378); font-size:12.5px; margin-bottom:18px; }
+  .lock-dots{ display:flex; justify-content:center; gap:12px; margin:0 0 18px; }
+  .lock-dot{ width:14px; height:14px; border-radius:50%; border:2px solid var(--line,#e5ddd0); background:#fff; transition:background .12s,border-color .12s; }
+  .lock-dot.filled{ background:var(--amber-deeper,#78350F); border-color:var(--amber-deeper,#78350F); }
+  .lock-keypad{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .lock-keypad button{
+    padding:14px 0; border:1px solid var(--line,#e5ddd0); border-radius:10px; background:#fff;
+    font-size:18px; font-weight:700; cursor:pointer;
+  }
+  .lock-keypad button:active{ background:#f3ede2; }
+  .lock-keypad button.lock-empty{ visibility:hidden; cursor:default; }
+  .lock-error{ background:#FEE2E2; color:#991B1B; font-size:12px; padding:8px 10px; border-radius:8px; margin-top:14px; display:none; }
+  .lock-error.show{ display:block; }
+  .lock-signout{ display:block; margin-top:16px; font-size:12.5px; color:var(--amber-deeper,#78350F); font-weight:700; text-decoration:underline; cursor:pointer; }
+
   /* ── View-only lock (Marketing Assistant browsing another depot) ── */
   .view-lock-banner{
     display:none; align-items:center; justify-content:space-between; gap:10px;
@@ -431,6 +458,7 @@
     <div id="authLoginForm">
       <h2>Sign in</h2>
       <div class="auth-sub">Satellite Depot Manager</div>
+      <button class="auth-primary-btn" type="button" id="authBiometricBtn" style="display:none; margin-top:0; margin-bottom:14px;">👆 Sign in with Biometrics</button>
       <label>Username</label>
       <input type="text" id="authLoginUsername" autocomplete="username" autocapitalize="off">
       <label>Password</label>
@@ -438,6 +466,7 @@
       <div class="auth-error" id="authLoginError"></div>
       <button class="auth-primary-btn" type="button" id="authLoginBtn">Sign in</button>
       <div class="auth-switch">No account? <a id="authGoToSignup">Create one</a></div>
+      <div class="auth-switch">Forgot your password? <a id="authGoToForgot">Reset it</a></div>
     </div>
     <div id="authSignupForm" style="display:none;">
       <h2>Create account</h2>
@@ -446,6 +475,8 @@
       <input type="text" id="authSignupName">
       <label>Username</label>
       <input type="text" id="authSignupUsername" autocomplete="username" autocapitalize="off">
+      <label>Recovery email (optional, but needed to reset your password later)</label>
+      <input type="email" id="authSignupEmail" autocomplete="email">
       <label>Password (min 6 characters)</label>
       <input type="password" id="authSignupPassword" autocomplete="new-password">
       <label>Confirm password</label>
@@ -454,9 +485,44 @@
       <button class="auth-primary-btn" type="button" id="authSignupBtn">Create account</button>
       <div class="auth-switch">Already have an account? <a id="authGoToLogin">Sign in</a></div>
     </div>
+    <div id="authForgotResetForm" style="display:none;">
+      <h2>Reset password</h2>
+      <div class="auth-sub">Enter your username and the recovery email on file, plus your new password.</div>
+      <label>Username</label>
+      <input type="text" id="authForgotUsername" autocapitalize="off">
+      <label>Recovery email</label>
+      <input type="email" id="authForgotEmail" autocomplete="email">
+      <label>New password (min 6 characters)</label>
+      <input type="password" id="authForgotNewPassword" autocomplete="new-password">
+      <div class="auth-error" id="authForgotResetError"></div>
+      <button class="auth-primary-btn" type="button" id="authForgotResetBtn">Reset password</button>
+      <div class="auth-switch">Remembered it? <a id="authForgotBackToLogin2">Sign in</a></div>
+    </div>
   </div>
 </div>
 <!-- ════════ END AUTH GATE ════════ -->
+
+<!-- ════════ SCREEN LOCK (PIN re-entry after idle) ════════ -->
+<div class="lock-gate" id="lockGate">
+  <div class="lock-card">
+    <h2 id="lockTitle">Enter your PIN</h2>
+    <div class="lock-sub" id="lockSub">Satellite Depot Manager was locked after a period of inactivity.</div>
+    <div class="lock-dots" id="lockDots">
+      <div class="lock-dot" data-i="0"></div><div class="lock-dot" data-i="1"></div>
+      <div class="lock-dot" data-i="2"></div><div class="lock-dot" data-i="3"></div>
+    </div>
+    <div class="lock-keypad" id="lockKeypad">
+      <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+      <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
+      <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
+      <button type="button" class="lock-empty" tabindex="-1"></button><button type="button" data-k="0">0</button><button type="button" data-k="back">⌫</button>
+    </div>
+    <div class="lock-error" id="lockError"></div>
+    <a class="lock-signout" id="lockSignOutLink">Not you? Sign out</a>
+    <a class="lock-signout" id="lockCancelLink" style="display:none;">Cancel</a>
+  </div>
+</div>
+<!-- ════════ END SCREEN LOCK ════════ -->
 
 <div class="brandbar">
   <div class="top">
@@ -500,7 +566,10 @@
   <button data-tab="payroll" class=""><span class="di">💵</span>Payroll</button>
   <button data-tab="reports" class=""><span class="di">📋</span>Reports</button>
   <button data-tab="settings" class="active"><span class="di">⚙️</span>Settings</button>
-  <button type="button" id="logoutBtn" style="margin-top:auto; color:var(--rust,#b91c1c);"><span class="di">🚪</span>Log out</button>
+  <button type="button" id="setRecoveryEmailBtn" style="margin-top:auto;"><span class="di">✉️</span>Recovery Email</button>
+  <button type="button" id="biometricLoginBtn"><span class="di">👆</span>Biometric Login</button>
+  <button type="button" id="setLockPinBtn"><span class="di">🔒</span>Set Lock PIN</button>
+  <button type="button" id="logoutBtn"><span class="di">🚪</span>Log out</button>
 </nav>
 
 <div class="container" style="margin-top:14px;">
@@ -854,8 +923,7 @@
           <input type="text" id="depotCodeInput" placeholder="e.g. LUA-MWE-MUT-SK7Q3M" style="text-transform:uppercase;">
           <button class="btn btn-primary" type="button" id="linkDepotBtn">Link</button>
         </div>
-        <p class="muted" style="margin:10px 0 4px;">Setting up this depot for the first time?</p>
-        <button class="btn btn-block" type="button" id="createDepotBtn">Create new cloud depot</button>
+        <p class="muted" style="margin-top:4px;">Setting up this depot for the first time? Use "Create a brand-new depot" below instead.</p>
       </div>
     </div>
     <div id="multiDepotCards">
@@ -897,7 +965,7 @@
           <input type="text" id="newDepotProvinceInput" placeholder="Province, e.g. Luapula" value="Luapula">
         </div>
         <button class="btn btn-primary btn-block" type="button" id="createNewDepotBtn" style="margin-top:8px;">Create depot</button>
-        <p class="muted" style="margin-top:4px;">Adds a fresh, empty depot to your list - this device stays on the depot you're currently viewing.</p>
+        <p class="muted" style="margin-top:4px;">Adds a fresh, empty depot. If you're not viewing any depot yet, this device switches straight into it - otherwise your current depot stays active and the new one just joins your list above.</p>
       </div>
     </div>
     <div class="card">
@@ -988,7 +1056,7 @@
 // registration URL below, so the service worker cache name always tracks
 // this single constant — no need to hand-edit a separate CACHE_NAME in
 // sw.js and risk the two drifting out of sync.
-const APP_VER = 'v1.4.0'; // bumped: "My Depots" now has a Create-a-new-depot form that adds a fresh depot to an Assistant's list without switching this device off the one they're currently on
+const APP_VER = 'v1.5.0'; // bumped: removed the separate "Create new cloud depot" button - "Create a brand-new depot" in My Depots is now the only create flow, and auto-switches this device into it when nothing was active yet
 const STORAGE_KEY = 'fraDepotData_v3';
 const CROPS = ['Maize','Soyabeans','Rice'];
 const DEFAULT_EQUIPMENT = ['Bags','Twine','Sieves','Tents','Scales'];
@@ -1476,13 +1544,15 @@ const CloudSync = {
   },
 
   // Creates a brand-new, empty depot directly in the cloud and adds it to
-  // the calling Assistant's own depot list - deliberately does NOT touch
-  // this.depotId, the local DB, or localStorage, so the device stays on
-  // whichever depot is currently active. This is the "add another depot
-  // without leaving the one I'm on" counterpart to createDepotBtn's
-  // first-time-setup flow, which pushes the *current* DB and switches
-  // this device to it - reusing that flow here would clone whatever
-  // depot is currently loaded into the brand-new one, which is wrong.
+  // the calling Assistant's own depot list. This is the sole "create a
+  // depot" path now - the click handler decides afterward whether to
+  // switch this device into it: straight away if nothing was active yet
+  // (first-time setup, nothing to lose), or left alone with the new
+  // depot just added to the list if this device was already on one.
+  // createRemoteDepot() itself always builds a fresh empty blob (never
+  // the currently-loaded DB) specifically so that second case is safe -
+  // pushing the current DB into a new code would clone whatever depot
+  // is already active into the brand-new one, which would be wrong.
   //
   // Order matters: rememberDepotForAssistant() must land before the
   // write below - satDepotManager/$depotId's rule only allows a write
@@ -1524,10 +1594,11 @@ const CloudSync = {
   //  - true  = an explicit "Link depot" action (operator just typed a
   //            code). If nothing exists at that code yet, this is far
   //            more likely a mistyped code than someone deliberately
-  //            claiming a fresh one (createDepotBtn already handles the
-  //            deliberate case by pushing directly, without ever calling
-  //            pullFromCloud) - so confirm before seeding the cloud with
-  //            this device's data under that code.
+  //            claiming a fresh one (createRemoteDepot already handles
+  //            the deliberate case by writing the new depot's blob
+  //            directly, without ever calling pullFromCloud) - so confirm
+  //            before seeding the cloud with this device's data under
+  //            that code.
   //  - false/omitted = an automatic reconnect pull (app startup, 'online'
   //            event, periodic sweep) for a depot this device is already
   //            linked to. An empty remote node here means a previously-
@@ -1791,14 +1862,14 @@ const AppAuth = {
     return this.session;
   },
 
-  async signup({ name, username, password, role, depotCode }){
+  async signup({ name, username, password, role, depotCode, email }){
     name = (name||'').trim(); username = (username||'').trim();
     if(!name || !username || !password) throw new Error('Fill in all fields.');
     if(password.length < 6) throw new Error('Password must be at least 6 characters.');
     if(role === 'CLERK' && !(depotCode||'').trim()) throw new Error('Enter the depot code your depot uses.');
     // sdmSignup does the username-uniqueness check, hashes the password,
     // and writes the session pointer, all server-side.
-    const result = await this._callFunction('sdmSignup', { name, username, password, role, depotCode });
+    const result = await this._callFunction('sdmSignup', { name, username, password, role, depotCode, email });
     this.session = {
       userId: result.userId, username: result.username, name: result.name, role: result.role,
       depotId: result.depotId || null,
@@ -1806,6 +1877,22 @@ const AppAuth = {
     };
     this.saveLocalSession();
     return this.session;
+  },
+
+  // Adds or changes the recovery email on the currently signed-in
+  // account. Server re-resolves the account from the session pointer,
+  // so this can never be pointed at someone else's account.
+  async setRecoveryEmail(email){
+    return await this._callFunction('sdmSetRecoveryEmail', { email });
+  },
+
+  // No emailed code involved - the server checks the submitted email
+  // against the one on file for that username and, if it matches, sets
+  // the new password directly. See sdmResetPasswordWithEmail server-side
+  // for the tradeoff this simplicity carries.
+  async resetPasswordWithEmail(username, recoveryEmail, newPassword){
+    if(!newPassword || newPassword.length < 6) throw new Error('Password must be at least 6 characters.');
+    return await this._callFunction('sdmResetPasswordWithEmail', { username, recoveryEmail, newPassword });
   },
 
   // Persists a depotId into the logged-in Assistant's own account record
@@ -1860,6 +1947,173 @@ const AppAuth = {
     this.clearLocalSession();
     document.body.classList.remove('editing-locked');
     window.location.reload(); // simplest clean-slate reset back to the login gate
+  }
+};
+
+/* ── ScreenLock — local PIN re-lock after N minutes idle ──
+   Separate from AppAuth: AppAuth gates the *session* (who's logged in),
+   ScreenLock gates the *screen* while that session stays live, so
+   someone who steps away from the device briefly gets asked for a quick
+   PIN instead of a full re-login. The PIN is device-local only (never
+   sent anywhere) and tied to the current AppAuth.session.userId, so a
+   different account logging in on the same device starts fresh.
+
+   Idle is tracked via a timestamp in localStorage rather than trusting
+   a bare setTimeout, because Android WebViews commonly throttle or
+   suspend JS timers once backgrounded - elapsed time is instead
+   recomputed from that stored timestamp whenever the page becomes
+   visible again, on a periodic check while visible, and once at boot
+   (covers the app being killed and relaunched after the window elapsed).
+
+   Default timeout is 5 minutes - change SDM_LOCK_TIMEOUT_MS to adjust. */
+const SDM_LOCK_PIN_KEY = 'sdmLockPin_v1';           // { hash, salt, ownerId }
+const SDM_LOCK_ACTIVITY_KEY = 'sdmLockActivity_v1'; // last-activity ms timestamp
+const SDM_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
+
+async function _sdmSha256Hex(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=> b.toString(16).padStart(2,'0')).join('');
+}
+function _sdmRandomSaltHex(){
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes).map(b=> b.toString(16).padStart(2,'0')).join('');
+}
+
+const ScreenLock = {
+  locked: false,
+  _inited: false,
+  _lastWrite: 0,
+
+  _pinRecord(){
+    try{ return JSON.parse(localStorage.getItem(SDM_LOCK_PIN_KEY) || 'null'); }
+    catch(e){ return null; }
+  },
+
+  // A PIN only "counts" for the account that's currently signed in - an
+  // old record from a previous account left on this device is simply
+  // ignored (and gets overwritten if that account sets a new PIN).
+  hasPin(){
+    const rec = this._pinRecord();
+    return !!(rec && AppAuth.session && rec.ownerId === AppAuth.session.userId);
+  },
+
+  async setupPin(pin){
+    if(!/^\d{4}$/.test(pin||'')) throw new Error('PIN must be exactly 4 digits.');
+    if(!AppAuth.session) throw new Error('Sign in first.');
+    const salt = _sdmRandomSaltHex();
+    const hash = await _sdmSha256Hex(salt + pin);
+    localStorage.setItem(SDM_LOCK_PIN_KEY, JSON.stringify({ hash, salt, ownerId: AppAuth.session.userId }));
+    this.recordActivity();
+  },
+
+  async verifyPin(pin){
+    const rec = this._pinRecord();
+    if(!rec) return false;
+    const hash = await _sdmSha256Hex(rec.salt + (pin||''));
+    return hash === rec.hash;
+  },
+
+  recordActivity(){
+    const now = Date.now();
+    // Throttle the localStorage write - once every 5s of activity is plenty,
+    // this fires on every click/keydown/scroll otherwise.
+    if(now - this._lastWrite > 5000){
+      localStorage.setItem(SDM_LOCK_ACTIVITY_KEY, String(now));
+      this._lastWrite = now;
+    }
+  },
+
+  _lastActivity(){
+    const v = parseInt(localStorage.getItem(SDM_LOCK_ACTIVITY_KEY) || '0', 10);
+    return v || Date.now();
+  },
+
+  checkIdle(){
+    if(!this.hasPin() || this.locked) return;
+    if(Date.now() - this._lastActivity() >= SDM_LOCK_TIMEOUT_MS) this.lock();
+  },
+
+  lock(){
+    if(!this.hasPin() || this.locked) return;
+    this.locked = true;
+    const gate = document.getElementById('lockGate');
+    if(gate) gate.classList.add('show');
+    if(typeof _lockClearEntry === 'function') _lockClearEntry();
+  },
+
+  unlock(){
+    this.locked = false;
+    const gate = document.getElementById('lockGate');
+    if(gate) gate.classList.remove('show');
+    localStorage.setItem(SDM_LOCK_ACTIVITY_KEY, String(Date.now()));
+    this._lastWrite = Date.now();
+  },
+
+  // Wires the idle-tracking listeners once per app load. Safe to call
+  // more than once (e.g. after both a restored session and a fresh
+  // login) - checkIdle()/lock() are themselves no-ops when nothing needs
+  // locking, so a redundant call just costs nothing.
+  init(){
+    if(this._inited) return;
+    this._inited = true;
+    ['click','keydown','touchstart','scroll'].forEach(evt=>{
+      document.addEventListener(evt, ()=> this.recordActivity(), { passive: true });
+    });
+    document.addEventListener('visibilitychange', ()=>{
+      if(document.visibilityState === 'visible') this.checkIdle();
+    });
+    setInterval(()=> this.checkIdle(), 15000);
+    this.recordActivity();
+    this.checkIdle(); // catches an already-elapsed idle window from before this load
+  }
+};
+
+/* ── BiometricAuth — Median.co native biometric login (fingerprint/face) ──
+   Median's WebView wrapper injects a `median` JS bridge object at
+   runtime when running inside the packaged app - it's simply absent in
+   a plain browser tab, so every call below is feature-detected first
+   and silently no-ops outside the app. Requires the Face ID/Touch ID
+   Android Biometric plugin enabled in Median App Studio (a paid add-on)
+   - see docs.median.co/docs/android-biometric-auth.
+
+   The "secret" median.auth stores is just this app's own username and
+   password, JSON-encoded. median.auth.save() hands it to hardware-
+   backed secure storage (Android Keystore/iOS Keychain) that only
+   releases it again after a passed biometric challenge - retrieving it
+   is then just a normal sdmLogin call with the recovered credentials.
+   Biometrics never talk to the server directly; they only gate access
+   to credentials that already work with the existing login flow. */
+const BiometricAuth = {
+  available(){ return typeof median !== 'undefined' && median && median.auth; },
+
+  async status(){
+    if(!this.available()) return { hasTouchId:false, hasSecret:false };
+    try{ return await median.auth.status({}); }
+    catch(e){ return { hasTouchId:false, hasSecret:false }; }
+  },
+
+  async save(username, password){
+    if(!this.available()) return false;
+    try{
+      const result = await median.auth.save({ secret: JSON.stringify({ username, password }) });
+      return !!(result && result.success);
+    }catch(e){ return false; }
+  },
+
+  // Resolves { username, password } on success, or null on any failure/
+  // cancel/unavailability - callers should just fall back to manual login.
+  async retrieve(){
+    if(!this.available()) return null;
+    try{
+      const result = await median.auth.get({ prompt: 'Sign in to Satellite Depot Manager' });
+      if(result && result.success && result.secret) return JSON.parse(result.secret);
+      return null;
+    }catch(e){ return null; }
+  },
+
+  async clear(){
+    if(!this.available()) return;
+    try{ await median.auth.delete({}); }catch(e){ /* nothing saved - fine */ }
   }
 };
 
@@ -3716,7 +3970,7 @@ async function renderDepotSwitcher(){
   const entries = await DepotIndex.listEntries();
   const ids = Object.keys(entries);
   if(!ids.length){
-    el.innerHTML = '<p class="muted">No depots in your list yet. Link or create one above, or add a known code below.</p>';
+    el.innerHTML = '<p class="muted">No depots in your list yet. Create a brand-new one or add a known code below.</p>';
     return;
   }
   ids.sort((a,b)=> (entries[a].addedAt||0) - (entries[b].addedAt||0));
@@ -3970,20 +4224,6 @@ document.getElementById('linkDepotBtn').addEventListener('click', async ()=>{
   toast('Linking to depot ' + code + '…');
 });
 
-document.getElementById('createDepotBtn').addEventListener('click', async ()=>{
-  if(!CloudSync.configured){ toast('Cloud sync is not set up yet on this app'); return; }
-  const code = CloudSync.generateDepotCode();
-  CloudSync.setDepotId(code);
-  renderCloudSyncCard();
-  // Same ordering fix as linkDepotBtn above - the pointer must include
-  // this depot before the push, or the very first write can be denied.
-  await AppAuth.rememberDepotForAssistant(code);
-  CloudSync.pushToCloud(); // seed the cloud with this device's current data
-  DepotIndex.addEntry(code, DB.settings.depotName).then(renderDepotSwitcher); // register in this manager's list too
-  applyViewOnlyForCurrentDepot();
-  toast('Cloud depot created: ' + code);
-});
-
 document.getElementById('addDepotIndexBtn').addEventListener('click', async ()=>{
   const code = document.getElementById('addDepotIndexCode').value.trim().toUpperCase();
   const label = document.getElementById('addDepotIndexLabel').value.trim();
@@ -4007,12 +4247,18 @@ document.getElementById('createNewDepotBtn').addEventListener('click', async ()=
   btn.disabled = true;
   btn.textContent = 'Creating…';
   try{
+    const wasUnlinked = !CloudSync.depotId; // nothing active yet - safe to switch straight in
     const code = await CloudSync.createRemoteDepot({ depotName, district, province });
     document.getElementById('newDepotNameInput').value = '';
     document.getElementById('newDepotDistrictInput').value = '';
     document.getElementById('newDepotProvinceInput').value = 'Luapula';
-    renderDepotSwitcher();
-    toast('Created depot ' + code + ' - switch to it above whenever you\'re ready');
+    if(wasUnlinked){
+      await switchActiveDepot(code);
+      toast('Created and switched to depot ' + code);
+    } else {
+      renderDepotSwitcher();
+      toast('Created depot ' + code + ' - switch to it above whenever you\'re ready');
+    }
   }catch(e){
     toast('Could not create depot: ' + (e.message || 'please try again.'));
   }finally{
@@ -4157,6 +4403,7 @@ async function bootAfterAuth(){
   }
   initAll();
   applyRoleUI();
+  ScreenLock.init();
   // Previously awaited AppAuth._refreshServerSession() here to cover the
   // restored-session fast path (loadLocalSession skips login/signup
   // entirely, so nothing else would refresh the pointer for it). Removed
@@ -4207,17 +4454,60 @@ function bootApp(){
     signupForm.style.display = 'none'; loginForm.style.display = '';
   });
 
+  /* ── Biometric login ── */
+  const bioBtn = document.getElementById('authBiometricBtn');
+
+  async function refreshBiometricButton(){
+    const status = await BiometricAuth.status();
+    bioBtn.style.display = (status.hasTouchId && status.hasSecret) ? '' : 'none';
+  }
+  refreshBiometricButton();
+
+  // After a successful manual login/signup, offer to turn biometrics on
+  // for next time - only if the device supports it and nothing's saved yet.
+  async function maybeOfferBiometricEnroll(username, password){
+    if(!BiometricAuth.available()) return;
+    const status = await BiometricAuth.status();
+    if(!status.hasTouchId || status.hasSecret) return;
+    if(confirm('Enable biometric sign-in on this device?')){
+      const ok = await BiometricAuth.save(username, password);
+      if(ok) toast('Biometric sign-in enabled.');
+    }
+  }
+
+  bioBtn.addEventListener('click', async ()=>{
+    loginErr.classList.remove('show');
+    bioBtn.disabled = true; bioBtn.textContent = 'Authenticating…';
+    const creds = await BiometricAuth.retrieve();
+    if(creds && creds.username && creds.password){
+      try{
+        await AppAuth.login(creds.username, creds.password);
+        await bootAfterAuth();
+        toast('Welcome back, ' + AppAuth.session.name);
+      }catch(e){
+        loginErr.textContent = e.message || 'Sign in failed.';
+        loginErr.classList.add('show');
+        // Saved credentials no longer work (e.g. password was changed
+        // elsewhere) - clear them so this button stops offering a login
+        // that will just fail again.
+        await BiometricAuth.clear();
+        bioBtn.style.display = 'none';
+      }
+    }
+    bioBtn.disabled = false; bioBtn.textContent = '👆 Sign in with Biometrics';
+  });
+
   document.getElementById('authLoginBtn').addEventListener('click', async ()=>{
     loginErr.classList.remove('show');
     const btn = document.getElementById('authLoginBtn');
     btn.disabled = true; btn.textContent = 'Signing in…';
+    const username = document.getElementById('authLoginUsername').value;
+    const password = document.getElementById('authLoginPassword').value;
     try{
-      await AppAuth.login(
-        document.getElementById('authLoginUsername').value,
-        document.getElementById('authLoginPassword').value
-      );
+      await AppAuth.login(username, password);
       await bootAfterAuth();
       toast('Welcome back, ' + AppAuth.session.name);
+      await maybeOfferBiometricEnroll(username, password);
     }catch(e){
       loginErr.textContent = e.message || 'Sign in failed.';
       loginErr.classList.add('show');
@@ -4238,15 +4528,18 @@ function bootApp(){
     }
     const btn = document.getElementById('authSignupBtn');
     btn.disabled = true; btn.textContent = 'Creating…';
+    const signupUsername = document.getElementById('authSignupUsername').value;
     try{
       await AppAuth.signup({
         name: document.getElementById('authSignupName').value,
-        username: document.getElementById('authSignupUsername').value,
+        username: signupUsername,
         password: pw,
-        role: 'ASSISTANT'
+        role: 'ASSISTANT',
+        email: document.getElementById('authSignupEmail').value
       });
       await bootAfterAuth();
       toast('Account created - welcome, ' + AppAuth.session.name);
+      await maybeOfferBiometricEnroll(signupUsername, pw);
     }catch(e){
       signupErr.textContent = e.message || 'Could not create account.';
       signupErr.classList.add('show');
@@ -4257,6 +4550,177 @@ function bootApp(){
   document.getElementById('logoutBtn').addEventListener('click', ()=>{
     if(confirm('Log out of this device?')) AppAuth.logout();
   });
+
+  /* ── Forgot-password flow: username + recovery email + new password ── */
+  const forgotResetForm = document.getElementById('authForgotResetForm');
+  const forgotResetErr = document.getElementById('authForgotResetError');
+
+  function showLogin(){
+    loginForm.style.display = ''; signupForm.style.display = 'none';
+    forgotResetForm.style.display = 'none';
+  }
+  function showForgotReset(){
+    loginForm.style.display = 'none'; signupForm.style.display = 'none';
+    forgotResetForm.style.display = '';
+    forgotResetErr.classList.remove('show');
+    document.getElementById('authForgotUsername').value = '';
+    document.getElementById('authForgotEmail').value = '';
+    document.getElementById('authForgotNewPassword').value = '';
+  }
+
+  document.getElementById('authGoToForgot').addEventListener('click', showForgotReset);
+  document.getElementById('authForgotBackToLogin2').addEventListener('click', showLogin);
+
+  document.getElementById('authForgotResetBtn').addEventListener('click', async ()=>{
+    forgotResetErr.classList.remove('show');
+    const username = document.getElementById('authForgotUsername').value.trim();
+    const recoveryEmail = document.getElementById('authForgotEmail').value.trim();
+    const newPassword = document.getElementById('authForgotNewPassword').value;
+    if(!username || !recoveryEmail){
+      forgotResetErr.textContent = 'Enter your username and recovery email.';
+      forgotResetErr.classList.add('show');
+      return;
+    }
+    const btn = document.getElementById('authForgotResetBtn');
+    btn.disabled = true; btn.textContent = 'Resetting…';
+    try{
+      await AppAuth.resetPasswordWithEmail(username, recoveryEmail, newPassword);
+      toast('Password reset - sign in with your new password.');
+      showLogin();
+      document.getElementById('authLoginUsername').value = username;
+    }catch(e){
+      forgotResetErr.textContent = e.message || "Username and recovery email don't match our records.";
+      forgotResetErr.classList.add('show');
+    }
+    btn.disabled = false; btn.textContent = 'Reset password';
+  });
+})();
+
+/* ── Lock-screen wiring ──
+   One keypad drives three modes: 'unlock' (the enforced idle-lock screen),
+   and 'setup'/'confirm' (voluntary PIN creation/change from the menu -
+   asks for the new PIN twice before saving it). */
+(function(){
+  const gate = document.getElementById('lockGate');
+  const dots = Array.from(document.querySelectorAll('#lockDots .lock-dot'));
+  const err = document.getElementById('lockError');
+  const title = document.getElementById('lockTitle');
+  const sub = document.getElementById('lockSub');
+  const signOutLink = document.getElementById('lockSignOutLink');
+  const cancelLink = document.getElementById('lockCancelLink');
+  let entry = '';
+  let mode = 'unlock'; // 'unlock' | 'setup' | 'confirm'
+  let firstPin = '';
+
+  function renderDots(){
+    dots.forEach((d,i)=> d.classList.toggle('filled', i < entry.length));
+  }
+  // Exposed so ScreenLock.lock() can reset stray keypad state before
+  // showing the enforced lock screen.
+  window._lockClearEntry = function(){
+    entry = ''; err.classList.remove('show'); renderDots();
+  };
+  function showError(msg){
+    err.textContent = msg; err.classList.add('show');
+    entry = ''; renderDots();
+  }
+  function resetToUnlockMode(){
+    mode = 'unlock'; entry = ''; firstPin = '';
+    title.textContent = 'Enter your PIN';
+    sub.textContent = 'Satellite Depot Manager was locked after a period of inactivity.';
+    cancelLink.style.display = 'none';
+    signOutLink.style.display = '';
+    err.classList.remove('show');
+    renderDots();
+  }
+
+  async function submitEntry(){
+    if(mode === 'unlock'){
+      const ok = await ScreenLock.verifyPin(entry);
+      if(ok){ ScreenLock.unlock(); entry=''; renderDots(); }
+      else showError('Incorrect PIN. Try again.');
+    } else if(mode === 'setup'){
+      firstPin = entry; entry = '';
+      mode = 'confirm';
+      title.textContent = 'Confirm your PIN';
+      sub.textContent = 'Enter the same 4 digits again.';
+      renderDots();
+    } else if(mode === 'confirm'){
+      if(entry === firstPin){
+        try{
+          await ScreenLock.setupPin(entry);
+          gate.classList.remove('show');
+          resetToUnlockMode();
+          toast('Lock PIN set.');
+        }catch(e){ showError(e.message || 'Could not save PIN.'); }
+      } else {
+        showError('PINs did not match. Start over.');
+        mode = 'setup'; firstPin = '';
+        title.textContent = 'Set a Lock PIN';
+        sub.textContent = 'Choose 4 digits to lock this device.';
+      }
+    }
+  }
+
+  document.getElementById('lockKeypad').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-k]');
+    if(!btn) return;
+    const k = btn.getAttribute('data-k');
+    if(k === 'back'){ entry = entry.slice(0,-1); renderDots(); return; }
+    if(entry.length >= 4) return;
+    entry += k;
+    renderDots();
+    if(entry.length === 4) submitEntry();
+  });
+
+  signOutLink.addEventListener('click', ()=>{
+    if(confirm('Sign out of this device?')) AppAuth.logout();
+  });
+
+  cancelLink.addEventListener('click', ()=>{
+    gate.classList.remove('show');
+    resetToUnlockMode();
+  });
+
+  document.getElementById('setLockPinBtn').addEventListener('click', ()=>{
+    if(!AppAuth.session){ toast('Sign in first.'); return; }
+    mode = 'setup'; firstPin = ''; entry = '';
+    title.textContent = 'Set a Lock PIN';
+    sub.textContent = 'Choose 4 digits to lock this device.';
+    cancelLink.style.display = '';
+    signOutLink.style.display = 'none';
+    err.classList.remove('show');
+    renderDots();
+    gate.classList.add('show');
+  });
+  document.getElementById('setRecoveryEmailBtn').addEventListener('click', async ()=>{
+    if(!AppAuth.session){ toast('Sign in first.'); return; }
+    const email = (prompt('Recovery email (used only to reset your password if you forget it):') || '').trim();
+    if(!email) return;
+    try{
+      await AppAuth.setRecoveryEmail(email);
+      toast('Recovery email saved.');
+    }catch(e){
+      toast(e.message || 'Could not save recovery email.');
+    }
+  });
+
+  document.getElementById('biometricLoginBtn').addEventListener('click', async ()=>{
+    if(!AppAuth.session){ toast('Sign in first.'); return; }
+    if(!BiometricAuth.available()){ toast('Biometric login is not available on this device.'); return; }
+    const status = await BiometricAuth.status();
+    if(!status.hasTouchId){ toast('No biometrics enrolled on this device.'); return; }
+    if(status.hasSecret){
+      await BiometricAuth.clear();
+      toast('Biometric sign-in turned off.');
+      return;
+    }
+    const password = prompt('Re-enter your password to enable biometric sign-in:');
+    if(!password) return;
+    const ok = await BiometricAuth.save(AppAuth.session.username, password);
+    toast(ok ? 'Biometric sign-in enabled.' : 'Could not enable biometric sign-in.');
+  });
+
 })();
 
 bootApp();
