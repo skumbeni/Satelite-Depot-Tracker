@@ -2076,22 +2076,21 @@ const AppAuth = {
   }
 };
 
-/* ── ScreenLock — local PIN re-lock after N minutes idle ──
+/* ── ScreenLock — requires the PIN every time the app is opened/resumed ──
    Separate from AppAuth: AppAuth gates the *session* (who's logged in),
-   ScreenLock gates the *screen* while that session stays live, so
-   someone who steps away from the device briefly gets asked for a quick
-   PIN instead of a full re-login. The PIN is device-local only (never
-   sent anywhere) and tied to the current AppAuth.session.userId, so a
-   different account logging in on the same device starts fresh.
+   ScreenLock gates the *screen* while that session stays live. The PIN
+   is device-local only (never sent anywhere) and tied to the current
+   AppAuth.session.userId, so a different account logging in on the same
+   device starts fresh.
 
-   Idle is tracked via a timestamp in localStorage rather than trusting
-   a bare setTimeout, because Android WebViews commonly throttle or
-   suspend JS timers once backgrounded - elapsed time is instead
-   recomputed from that stored timestamp whenever the page becomes
-   visible again, on a periodic check while visible, and once at boot
-   (covers the app being killed and relaunched after the window elapsed).
+   Locks immediately (not after any idle delay) in two cases:
+   - the app is backgrounded/hidden (visibilitychange -> 'hidden'), so
+     switching away and back always re-demands the PIN, and
+   - a fresh page load/relaunch (covers the app being fully closed and
+     reopened, or killed and relaunched by the OS).
 
-   Default timeout is 5 minutes - change SDM_LOCK_TIMEOUT_MS to adjust. */
+   SDM_LOCK_TIMEOUT_MS/checkIdle() are kept around but unused by default -
+   harmless if something else wants an idle-based grace period later. */
 const SDM_LOCK_PIN_KEY = 'sdmLockPin_v1';           // { hash, salt, ownerId }
 const SDM_LOCK_ACTIVITY_KEY = 'sdmLockActivity_v1'; // last-activity ms timestamp
 const SDM_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
@@ -2185,12 +2184,20 @@ const ScreenLock = {
     ['click','keydown','touchstart','scroll'].forEach(evt=>{
       document.addEventListener(evt, ()=> this.recordActivity(), { passive: true });
     });
+    // BEHAVIOR CHANGE: lock immediately whenever the app is backgrounded
+    // (tab/window hidden, or the OS sends the app to the background),
+    // not just after SDM_LOCK_TIMEOUT_MS of idle time. This is what makes
+    // "closing" the app - even briefly, even if Android keeps the WebView
+    // alive in memory rather than killing it - always require the PIN
+    // again on return, instead of only after a 5-minute idle window.
     document.addEventListener('visibilitychange', ()=>{
-      if(document.visibilityState === 'visible') this.checkIdle();
+      if(document.visibilityState === 'hidden') this.lock();
     });
-    setInterval(()=> this.checkIdle(), 15000);
     this.recordActivity();
-    this.checkIdle(); // catches an already-elapsed idle window from before this load
+    // Covers the case where the app WAS fully killed and relaunched (a
+    // fresh page load, not just a visibility change) - lock right away
+    // on load rather than waiting to see how long it's been.
+    this.lock();
   }
 };
 
