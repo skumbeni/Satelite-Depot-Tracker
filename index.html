@@ -67,6 +67,13 @@
   .brandbar h1{font-size:22px; margin:2px 0 0 0; color:#fff;}
   .brandbar .depotline{font-size:12px; color:rgba(255,255,255,.75); margin-top:2px;}
   .brandbar .datestamp{font-size:11px; color:rgba(255,255,255,.6); text-align:right; white-space:nowrap;}
+  .brandbar .datestamp-col{display:flex; flex-direction:column; align-items:flex-end; gap:5px;}
+  .brandbar .role-badge{
+    font-size:10px; font-weight:800; letter-spacing:.6px; white-space:nowrap;
+    padding:2px 8px; border-radius:20px; line-height:1.5;
+  }
+  .brandbar .role-badge.role-ma{background:rgba(234,179,8,.22); border:1px solid rgba(234,179,8,.55); color:#fff8e1;}
+  .brandbar .role-badge.role-sdc{background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.32); color:rgba(255,255,255,.9);}
 
   /* ── Layout ── */
   .container{padding:0 12px; max-width:560px; margin:0 auto;}
@@ -537,7 +544,10 @@
       <h1 id="depotTitle">Mutipula</h1>
       <div class="depotline" id="depotSubline">Mwense, Luapula</div>
     </div>
-    <div class="datestamp" id="todayStamp">15 Jul 2026</div>
+    <div class="datestamp-col">
+      <div class="datestamp" id="todayStamp">15 Jul 2026</div>
+      <div class="role-badge" id="roleBadge" style="display:none;"></div>
+    </div>
   </div>
 </div>
 
@@ -4633,6 +4643,28 @@ function initAll(){
 /* ── PHASE 10 — role-based UI restrictions ──
    CLERK: locked to one depot, so the multi-depot switcher/roll-up and the
    "link/create a different cloud depot" controls don't apply to them. */
+// Brandbar pill showing which kind of account is currently signed in on
+// this device - MA (Marketing Assistant, can hold/switch between several
+// depots) or SDC (Satellite Depot Clerk, pinned to one depot). Cheap way
+// to catch "wait, whose account am I in right now?" before it causes a
+// mix-up, especially on shared devices.
+function updateRoleBadge(){
+  const el = document.getElementById('roleBadge');
+  if(!el) return;
+  if(!AppAuth.session){ el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.classList.remove('role-ma', 'role-sdc');
+  if(AppAuth.isAssistant()){
+    el.textContent = 'MA';
+    el.title = 'Signed in as Marketing Assistant';
+    el.classList.add('role-ma');
+  } else {
+    el.textContent = 'SDC';
+    el.title = 'Signed in as Satellite Depot Clerk';
+    el.classList.add('role-sdc');
+  }
+}
+
 function applyRoleUI(){
   const multi = document.getElementById('multiDepotCards');
   const clerkHide = document.querySelectorAll('[data-clerk-hide]');
@@ -4645,6 +4677,7 @@ function applyRoleUI(){
     // governs visibility for non-clerks - just remove our override.
     clerkHide.forEach(el=> el.style.removeProperty('display'));
   }
+  updateRoleBadge();
   applyViewOnlyForCurrentDepot();
 }
 
