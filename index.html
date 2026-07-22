@@ -461,6 +461,8 @@
       <button class="auth-primary-btn" type="button" id="authBiometricBtn" style="display:none; margin-top:0; margin-bottom:14px;">👆 Sign in with Biometrics</button>
       <label>Username</label>
       <input type="text" id="authLoginUsername" autocomplete="username" autocapitalize="off">
+      <label>Depot ID <span class="muted" style="font-weight:400;">(Clerks only — leave blank if you're a Marketing Assistant)</span></label>
+      <input type="text" id="authLoginDepotId" placeholder="e.g. LUA-MWE-MUT-SK7Q3M" style="text-transform:uppercase;" autocapitalize="off">
       <label>Password</label>
       <input type="password" id="authLoginPassword" autocomplete="current-password">
       <div class="auth-error" id="authLoginError"></div>
@@ -973,6 +975,28 @@
       <h2>Combined Totals <span class="sub">read-only roll-up across all your depots</span></h2>
       <button class="btn btn-block" type="button" id="loadRollupBtn">Load combined totals</button>
       <div id="depotRollupView" style="display:none;margin-top:10px;"></div>
+    </div>
+    <div class="card">
+      <h2>Create Clerk Login <span class="sub">issue a login for a depot you oversee</span></h2>
+      <p class="muted" id="createClerkStatus">Link or create a depot above before creating a clerk login for it.</p>
+      <div id="createClerkForm" style="display:none;">
+        <label>Clerk's name</label>
+        <input type="text" id="createClerkName" placeholder="Full name">
+        <label>Username</label>
+        <input type="text" id="createClerkUsername" autocapitalize="off">
+        <label>Password (min 6 characters)</label>
+        <input type="password" id="createClerkPassword" autocomplete="new-password">
+        <label>Depot</label>
+        <select id="createClerkDepotSelect"></select>
+        <div class="auth-error" id="createClerkError"></div>
+        <button class="btn btn-primary btn-block" type="button" id="createClerkBtn" style="margin-top:8px;">Create Login</button>
+        <div id="createClerkResult" style="display:none;margin-top:10px;">
+          <p class="muted" style="margin-bottom:4px;">Send these to the clerk (along with the password you set):</p>
+          <p style="font-weight:700;margin:2px 0;">Username: <span id="createClerkResultUsername"></span></p>
+          <p style="font-weight:700;margin:2px 0;">Depot ID: <span id="createClerkResultDepotId"></span></p>
+          <button class="btn btn-sm" type="button" id="copyClerkCredsBtn" style="margin-top:6px;">Copy</button>
+        </div>
+      </div>
     </div>
     <div class="card">
       <h2>Transfer Clerk <span class="sub">move a clerk from this depot to another you manage</span></h2>
@@ -1891,7 +1915,7 @@ const AppAuth = {
 
   isAssistant(){ return !!this.session && this.session.role === 'ASSISTANT'; },
   isClerk(){ return !!this.session && this.session.role === 'CLERK'; },
-  async login(username, password){
+  async login(username, password, depotId){
     username = (username||'').trim();
     if(!username || !password) throw new Error('Enter your username and password.');
     const found = await _sdmFindByUsername(username);
@@ -1913,6 +1937,18 @@ const AppAuth = {
       }
     }
     if(!ok) throw new Error('Incorrect password.');
+
+    // Clerks must also supply the Depot ID their Marketing Assistant gave
+    // them along with the credentials, matched against the depotId the
+    // account was created under - a second factor beyond username/
+    // password, since a Clerk account is only ever meaningful tied to one
+    // specific depot. Assistants aren't pinned to a single depotId, so
+    // this check doesn't apply to them.
+    if(user.role === 'CLERK'){
+      const enteredDepotId = (depotId||'').trim().toUpperCase();
+      if(!enteredDepotId) throw new Error('Enter the Depot ID your Marketing Assistant gave you.');
+      if(enteredDepotId !== (user.depotId||'').toUpperCase()) throw new Error("That Depot ID doesn't match this account.");
+    }
 
     const authUser = await CloudSync.authReady;
     const session = { userId: id, role: user.role, depotId: user.depotId || null, depotIds: user.depotIds || {} };
@@ -2061,6 +2097,31 @@ const AppAuth = {
     if(!this.session.depotIds[normalized]) throw new Error('You must oversee the destination depot to transfer a clerk into it.');
     await CloudSync._request(`satDepotManagerUsers/${clerkUserId}/depotId`, 'PUT', normalized);
     return { clerkUserId, newDepotId: normalized };
+  },
+
+  // Lets a Marketing Assistant create a Clerk login for one of the
+  // depots they oversee. This never touches the Assistant's own
+  // session/localStorage - the new account is written straight to
+  // satDepotManagerUsers and the MA stays signed in as themselves. The
+  // MA is expected to relay the username/password/depotId to the clerk
+  // out-of-band (WhatsApp, in person, etc.); there's no email delivery.
+  async createClerkAccount({ name, username, password, depotId }){
+    if(!this.isAssistant()) throw new Error('Only Marketing Assistants can create Clerk logins.');
+    name = (name||'').trim(); username = (username||'').trim();
+    if(!name || !username || !password) throw new Error('Fill in all fields.');
+    if(password.length < 6) throw new Error('Password must be at least 6 characters.');
+    const normalizedDepotId = (depotId||'').trim().toUpperCase();
+    if(!normalizedDepotId) throw new Error('Choose a depot for this clerk.');
+    if(!this.session.depotIds[normalizedDepotId]) throw new Error('You must oversee this depot to create a clerk login for it.');
+
+    const existing = await _sdmFindByUsername(username);
+    if(existing && !existing.user.deleted) throw new Error('That username is already taken.');
+
+    const salt = _sdmRandomSaltHex();
+    const passwordHash = await _sdmPbkdf2Hex(password, salt);
+    const record = { name, username, passwordHash, salt, role: 'CLERK', depotId: normalizedDepotId, createdAt: Date.now() };
+    await CloudSync._request('satDepotManagerUsers', 'POST', record);
+    return { username, depotId: normalizedDepotId };
   },
 
   logout(){
@@ -2226,10 +2287,10 @@ const BiometricAuth = {
     catch(e){ return { hasTouchId:false, hasSecret:false }; }
   },
 
-  async save(username, password){
+  async save(username, password, depotId){
     if(!this.available()) return false;
     try{
-      const result = await median.auth.save({ secret: JSON.stringify({ username, password }) });
+      const result = await median.auth.save({ secret: JSON.stringify({ username, password, depotId: depotId || '' }) });
       return !!(result && result.success);
     }catch(e){ return false; }
   },
@@ -4136,8 +4197,77 @@ async function renderDepotSwitcher(){
     });
   });
 
+  renderCreateClerkCard(entries);
   renderTransferClerkCard(entries);
 }
+
+/* ---- Create Clerk Login card: lets a Marketing Assistant create a new
+   Clerk account tied to one of the depots they oversee. Creating the
+   login never signs this device into the new account - the Assistant
+   stays signed in as themselves throughout. ---- */
+async function renderCreateClerkCard(depotEntries){
+  const status = document.getElementById('createClerkStatus');
+  const form = document.getElementById('createClerkForm');
+  if(!status || !form) return;
+  if(!AppAuth.isAssistant() || !CloudSync.configured){
+    status.textContent = 'Sign in as a Marketing Assistant to create clerk logins.';
+    form.style.display = 'none';
+    return;
+  }
+
+  const entries = depotEntries || await DepotIndex.listEntries();
+  const ids = Object.keys(entries);
+  if(!ids.length){
+    status.textContent = 'Link or create a depot above before creating a clerk login for it.';
+    form.style.display = 'none';
+    return;
+  }
+
+  status.textContent = '';
+  form.style.display = '';
+  const depotSelect = document.getElementById('createClerkDepotSelect');
+  depotSelect.innerHTML = ids.map(id=>
+    `<option value="${escapeHtml(id)}">${escapeHtml(entries[id].label || id)}</option>`
+  ).join('');
+  if(CloudSync.depotId && ids.includes(CloudSync.depotId)) depotSelect.value = CloudSync.depotId;
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  const btn = document.getElementById('createClerkBtn');
+  if(!btn) return;
+  const err = document.getElementById('createClerkError');
+  const resultBox = document.getElementById('createClerkResult');
+  btn.addEventListener('click', async ()=>{
+    err.classList.remove('show');
+    resultBox.style.display = 'none';
+    const name = document.getElementById('createClerkName').value;
+    const username = document.getElementById('createClerkUsername').value;
+    const password = document.getElementById('createClerkPassword').value;
+    const depotId = document.getElementById('createClerkDepotSelect').value;
+    btn.disabled = true; btn.textContent = 'Creating…';
+    try{
+      const created = await AppAuth.createClerkAccount({ name, username, password, depotId });
+      document.getElementById('createClerkResultUsername').textContent = created.username;
+      document.getElementById('createClerkResultDepotId').textContent = created.depotId;
+      resultBox.style.display = '';
+      toast('Clerk login created.');
+    }catch(e){
+      err.textContent = e.message || 'Could not create clerk login.';
+      err.classList.add('show');
+    }
+    btn.disabled = false; btn.textContent = 'Create Login';
+  });
+
+  const copyBtn = document.getElementById('copyClerkCredsBtn');
+  if(copyBtn) copyBtn.addEventListener('click', ()=>{
+    const u = document.getElementById('createClerkResultUsername').textContent;
+    const d = document.getElementById('createClerkResultDepotId').textContent;
+    const text = `Username: ${u}\nDepot ID: ${d}`;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(()=> toast('Copied.')).catch(()=>{});
+    }
+  });
+});
 
 /* ---- Transfer Clerk card: lets a Marketing Assistant move a clerk from
    the currently-active depot to any other depot in their own list, via
@@ -4625,7 +4755,7 @@ function bootApp(){
     const status = await BiometricAuth.status();
     if(!status.hasTouchId || status.hasSecret) return;
     if(confirm('Enable biometric sign-in on this device?')){
-      const ok = await BiometricAuth.save(username, password);
+      const ok = await BiometricAuth.save(username, password, AppAuth.session && AppAuth.session.depotId);
       if(ok) toast('Biometric sign-in enabled.');
     }
   }
@@ -4636,7 +4766,7 @@ function bootApp(){
     const creds = await BiometricAuth.retrieve();
     if(creds && creds.username && creds.password){
       try{
-        await AppAuth.login(creds.username, creds.password);
+        await AppAuth.login(creds.username, creds.password, creds.depotId);
         await bootAfterAuth();
         toast('Welcome back, ' + AppAuth.session.name);
       }catch(e){
@@ -4657,9 +4787,10 @@ function bootApp(){
     const btn = document.getElementById('authLoginBtn');
     btn.disabled = true; btn.textContent = 'Signing in…';
     const username = document.getElementById('authLoginUsername').value;
+    const depotIdField = document.getElementById('authLoginDepotId').value;
     const password = document.getElementById('authLoginPassword').value;
     try{
-      await AppAuth.login(username, password);
+      await AppAuth.login(username, password, depotIdField);
       await bootAfterAuth();
       toast('Welcome back, ' + AppAuth.session.name);
       await maybeOfferBiometricEnroll(username, password);
@@ -4911,7 +5042,7 @@ function bootApp(){
     }
     const password = prompt('Re-enter your password to enable biometric sign-in:');
     if(!password) return;
-    const ok = await BiometricAuth.save(AppAuth.session.username, password);
+    const ok = await BiometricAuth.save(AppAuth.session.username, password, AppAuth.session.depotId);
     toast(ok ? 'Biometric sign-in enabled.' : 'Could not enable biometric sign-in.');
   });
 
