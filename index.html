@@ -578,7 +578,7 @@
   <button data-tab="staff"><span class="di">👥</span>Staff</button>
   <button data-tab="payroll" class="" data-clerk-hide="true"><span class="di">💵</span>Payroll</button>
   <button data-tab="reports" class="" data-clerk-hide="true"><span class="di">📋</span>Reports</button>
-  <button data-tab="settings" class=""><span class="di">⚙️</span>Settings</button>
+  <button data-tab="settings" class="" data-clerk-hide="true"><span class="di">⚙️</span>Settings</button>
   <button type="button" id="setRecoveryEmailBtn" style="margin-top:auto;"><span class="di">✉️</span>Recovery Email</button>
   <button type="button" id="biometricLoginBtn"><span class="di">👆</span>Biometric Login</button>
   <button type="button" id="setLockPinBtn"><span class="di">🔒</span>Set Lock PIN</button>
@@ -2676,8 +2676,8 @@ document.getElementById('tabs').addEventListener('click', e=>{
   const btn = e.target.closest('button[data-tab]');
   if(!btn) return;
   const tab = btn.dataset.tab;
-  if((tab === 'payroll' || tab === 'reports') && typeof AppAuth !== 'undefined' && AppAuth.isClerk && AppAuth.isClerk()){
-    toast('Payroll and Reports are only available to the Manager account');
+  if((tab === 'payroll' || tab === 'reports' || tab === 'settings') && typeof AppAuth !== 'undefined' && AppAuth.isClerk && AppAuth.isClerk()){
+    toast('Payroll, Reports, and Settings are only available to the Manager account');
     closeDrawer();
     return;
   }
