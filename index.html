@@ -394,7 +394,7 @@
   .lock-error.show{ display:block; }
   .lock-signout{ display:block; margin-top:16px; font-size:12.5px; color:var(--amber-deeper,#78350F); font-weight:700; text-decoration:underline; cursor:pointer; }
 
-  /* ── View-only lock (Marketing Assistant browsing another depot) ── */
+  /* ── View-only lock (Manager browsing another depot) ── */
   .view-lock-banner{
     display:none; align-items:center; justify-content:space-between; gap:10px;
     background:#78350F; color:#fff; padding:10px 14px; font-size:12.5px; font-weight:600;
@@ -468,7 +468,7 @@
       <button class="auth-primary-btn" type="button" id="authBiometricBtn" style="display:none; margin-top:0; margin-bottom:14px;">👆 Sign in with Biometrics</button>
       <label>Username</label>
       <input type="text" id="authLoginUsername" autocomplete="username" autocapitalize="off">
-      <label>Depot ID <span class="muted" style="font-weight:400;">(Clerks only — leave blank if you're a Marketing Assistant)</span></label>
+      <label>Depot ID <span class="muted" style="font-weight:400;">(Supervisors only — leave blank if you're a Manager)</span></label>
       <input type="text" id="authLoginDepotId" placeholder="e.g. LUA-MWE-MUT-SK7Q3M" style="text-transform:uppercase;" autocapitalize="off">
       <label>Password</label>
       <input type="password" id="authLoginPassword" autocomplete="current-password">
@@ -479,7 +479,7 @@
     </div>
     <div id="authSignupForm" style="display:none;">
       <h2>Create account</h2>
-      <div class="auth-sub">Marketing Assistant sign-up</div>
+      <div class="auth-sub">Manager sign-up</div>
       <label>Your name</label>
       <input type="text" id="authSignupName">
       <label>Username</label>
@@ -576,8 +576,8 @@
   <button data-tab="grain"><span class="di">🌾</span>Grain</button>
   <button data-tab="equipment"><span class="di">🧰</span>Equipment and Requisites</button>
   <button data-tab="staff"><span class="di">👥</span>Staff</button>
-  <button data-tab="payroll" class=""><span class="di">💵</span>Payroll</button>
-  <button data-tab="reports" class=""><span class="di">📋</span>Reports</button>
+  <button data-tab="payroll" class="" data-clerk-hide="true"><span class="di">💵</span>Payroll</button>
+  <button data-tab="reports" class="" data-clerk-hide="true"><span class="di">📋</span>Reports</button>
   <button data-tab="settings" class=""><span class="di">⚙️</span>Settings</button>
   <button type="button" id="setRecoveryEmailBtn" style="margin-top:auto;"><span class="di">✉️</span>Recovery Email</button>
   <button type="button" id="biometricLoginBtn"><span class="di">👆</span>Biometric Login</button>
@@ -597,7 +597,7 @@
       <h2>Equipment and Requisites Alerts</h2>
       <div id="dashEquip"><div style="margin-bottom:6px;">Bags: <span class="pill low">0 left</span></div><div style="margin-bottom:6px;">Twine: <span class="pill low">0 left</span></div><div style="margin-bottom:6px;">Sieves: <span class="pill low">0 left</span></div><div style="margin-bottom:6px;">Tents: <span class="pill low">0 left</span></div><div style="margin-bottom:6px;">Scales: <span class="pill low">0 left</span></div></div>
     </div>
-    <div class="card">
+    <div class="card" data-clerk-hide="true">
       <h2>Wages Outstanding</h2>
       <div id="dashWages"><div class="empty">No workers logged yet.</div></div>
     </div>
@@ -746,7 +746,7 @@
             <option value="SDC" selected="selected">SDC</option>
             <option value="Guard">Guard</option>
           </select>
-          <input type="number" name="salary" placeholder="Salary (K/mo)" min="0" step="0.01">
+          <input type="number" name="salary" placeholder="Salary (K/mo)" min="0" step="0.01" data-clerk-hide>
         </div>
         <div class="row2">
           <input type="text" name="nrc" placeholder="NRC No. (e.g. 123456/78/9)">
@@ -904,9 +904,9 @@
           <div><label>District</label><input type="text" name="district" required="" value="Mwense"></div>
           <div><label>Province</label><input type="text" name="province" value="Luapula" required=""></div>
         </div>
-        <label>Marketing Assistant name</label>
+        <label>Manager name</label>
         <input type="text" name="maName" placeholder="e.g. Mr. Banda" value="Mr. S.Kumbeni">
-        <label>MA WhatsApp number</label>
+        <label>Manager WhatsApp number</label>
         <input type="tel" name="maPhone" placeholder="e.g. +260977123456" value="0977638790">
         <label>Delete PIN</label>
         <input type="text" name="deletePin" placeholder="4-digit PIN to authorise deletions" maxlength="10" value="1234">
@@ -987,10 +987,10 @@
       <div id="depotRollupView" style="display:none;margin-top:10px;"></div>
     </div>
     <div class="card">
-      <h2>Create Clerk Login <span class="sub">issue a login for a depot you oversee</span></h2>
-      <p class="muted" id="createClerkStatus">Link or create a depot above before creating a clerk login for it.</p>
+      <h2>Create Supervisor Login <span class="sub">issue a login for a depot you oversee</span></h2>
+      <p class="muted" id="createClerkStatus">Link or create a depot above before creating a supervisor login for it.</p>
       <div id="createClerkForm" style="display:none;">
-        <label>Clerk's name</label>
+        <label>Supervisor's name</label>
         <input type="text" id="createClerkName" placeholder="Full name">
         <label>Username</label>
         <input type="text" id="createClerkUsername" autocapitalize="off">
@@ -1001,7 +1001,7 @@
         <div class="auth-error" id="createClerkError"></div>
         <button class="btn btn-primary btn-block" type="button" id="createClerkBtn" style="margin-top:8px;">Create Login</button>
         <div id="createClerkResult" style="display:none;margin-top:10px;">
-          <p class="muted" style="margin-bottom:4px;">Send these to the clerk (along with the password you set):</p>
+          <p class="muted" style="margin-bottom:4px;">Send these to the supervisor (along with the password you set):</p>
           <p style="font-weight:700;margin:2px 0;">Username: <span id="createClerkResultUsername"></span></p>
           <p style="font-weight:700;margin:2px 0;">Depot ID: <span id="createClerkResultDepotId"></span></p>
           <button class="btn btn-sm" type="button" id="copyClerkCredsBtn" style="margin-top:6px;">Copy</button>
@@ -1009,10 +1009,10 @@
       </div>
     </div>
     <div class="card">
-      <h2>Transfer Clerk <span class="sub">move a clerk from this depot to another you manage</span></h2>
-      <p class="muted" id="transferClerkStatus">Loading clerks for this depot…</p>
+      <h2>Transfer Supervisor <span class="sub">move a supervisor from this depot to another you manage</span></h2>
+      <p class="muted" id="transferClerkStatus">Loading supervisors for this depot…</p>
       <div id="transferClerkForm" style="display:none;">
-        <label>Clerk</label>
+        <label>Supervisor</label>
         <select id="transferClerkSelect"></select>
         <label>Move to</label>
         <select id="transferClerkDestSelect"></select>
@@ -1558,7 +1558,7 @@ const CloudSync = {
   },
 
   // Generates a depot code built from a depot's province/district/name
-  // plus the creating Marketing Assistant's username, so the code is
+  // plus the creating Manager's username, so the code is
   // recognisable at a glance instead of a pure-random string - e.g.
   // province "Luapula", district "Mwense", depot name "Mutipula", MA
   // username "skumbeni" -> "LUA-MWE-MUT-SK7Q3M". The last segment still
@@ -1661,6 +1661,7 @@ const CloudSync = {
           const remoteUpdatedAt = (remote.settings && remote.settings._updatedAt) || 0;
           if(remoteUpdatedAt >= localUpdatedAt){
             DB = normalizeDB(remote);
+            await this._pullFinancial(); // merge salary back in by staff id (MA sessions only - see PHASE 17)
             invalidateMemo();
             persistLocal(); // writes STORAGE_KEY + this depot's own cache key (Phase 9 step 5)
             // Force a full re-render - this can land well after the initial
@@ -1723,6 +1724,89 @@ const CloudSync = {
     return this._withSyncMutex('push', ()=> this._doPush());
   },
 
+  /* =====================================================================
+     PHASE 17 — FINANCIAL-DATA SPLIT (fixed-staff salary, MA-only)
+     =====================================================================
+     Salary used to live inline on satDepotManager/{depotId}/staff/
+     fixedStaff/{index}/salary and synced as part of the one whole-blob
+     PUT/GET below. Two reasons that had to change:
+
+     1. RTDB security rules cascade *downward only*. Once satDepotManager/
+        {depotId} grants ".read" to any linked session (CLERK or
+        ASSISTANT - see the rules file), no rule on a deeper path can
+        claw that back for just one role. A ".read"/".write" added on
+        staff/fixedStaff/{id}/salary underneath that node would simply
+        never be consulted - the parent grant already covers it. Hiding
+        salary from CLERK sessions is therefore only enforceable from a
+        *separate* top-level node with its own rule, never as a nested
+        rule under a node that's already broadly readable.
+     2. fixedStaff is a plain JS array (position-keyed once serialized to
+        RTDB), not an id-keyed map. A partial/field-level update against
+        array *indices* is unsafe the moment entries are added, removed,
+        or reordered on one device while another device is offline -
+        salary values can silently attach to the wrong staff member.
+        Keying the separate financial node by staff `id` (not position)
+        sidesteps that entirely.
+
+     New node: satDepotManagerFinancial/{depotId}/salaries/{staffId} ->
+     number. Rule requires role != 'CLERK' (see rules file). The main
+     satDepotManager/{depotId} blob never carries `salary` on any
+     fixedStaff entry anymore - it's stripped on push and merged back in
+     on pull, for ASSISTANT sessions only.
+
+     Known accepted gap, same spirit as the ones already documented on
+     satDepotManagerUsers: a CLERK device that had synced salary figures
+     *before* this phase shipped keeps whatever was already sitting in
+     its localStorage cache until that cache is next overwritten. This
+     closes the gap going forward (server truth, and every fresh pull),
+     not the residual on an already-provisioned device.
+     ===================================================================== */
+  _financialPath(){ return 'satDepotManagerFinancial/'+this.depotId+'/salaries'; },
+
+  // Strips `salary` out of a deep-enough clone of DB.staff.fixedStaff so
+  // the main blob push never carries it. Only fixedStaff needs cloning -
+  // everything else in DB is sent as-is, same as before this phase.
+  _blobForMainPush(){
+    const blob = Object.assign({}, DB, {
+      staff: Object.assign({}, DB.staff, {
+        fixedStaff: DB.staff.fixedStaff.map(s=>{
+          const copy = Object.assign({}, s);
+          delete copy.salary;
+          return copy;
+        })
+      })
+    });
+    return blob;
+  },
+
+  async _pushFinancial(){
+    // Only the MA writes salary to the cloud. A CLERK session would be
+    // rejected by the rule anyway, but skipping the call avoids a
+    // guaranteed-denied request on every save.
+    const isClerkSession = typeof AppAuth !== 'undefined' && AppAuth.session && AppAuth.isClerk();
+    if(isClerkSession) return;
+    const salaries = {};
+    DB.staff.fixedStaff.forEach(s=>{ salaries[s.id] = s.salary || 0; });
+    await this._request(this._financialPath(), 'PUT', salaries);
+  },
+
+  // Merges cloud salary figures back onto DB.staff.fixedStaff by `id`
+  // (never by array position - see PHASE 17 note above). Silently no-ops
+  // for a CLERK session: the rule denies the read, and a denied RTDB read
+  // just comes back empty rather than erroring, so there's nothing to
+  // merge and existing local entries simply keep no `salary` field.
+  async _pullFinancial(){
+    if(typeof AppAuth !== 'undefined' && AppAuth.session && !AppAuth.isAssistant()) return;
+    try{
+      const salaries = await this._request(this._financialPath(), 'GET');
+      if(salaries) DB.staff.fixedStaff.forEach(s=>{ if(salaries[s.id] !== undefined) s.salary = salaries[s.id]; });
+    }catch(e){
+      // Non-fatal - the rest of the pull already succeeded. Salary just
+      // stays whatever it was locally until the next successful pull.
+      console.error('Financial pull failed', e);
+    }
+  },
+
   // The actual network push, only ever called from inside the mutex
   // (either directly by pushToCloud, or as the "local is newer" /
   // "nothing there yet" branches of pullFromCloud).
@@ -1731,7 +1815,8 @@ const CloudSync = {
     updateSyncStatusUI();
     try{
       DB.settings._updatedAt = Date.now();
-      await this._request('satDepotManager/'+this.depotId, 'PUT', DB);
+      await this._request('satDepotManager/'+this.depotId, 'PUT', this._blobForMainPush());
+      await this._pushFinancial();
       this.status = 'synced';
       this.clearDirty();
     }catch(e){
@@ -1948,7 +2033,7 @@ const AppAuth = {
     }
     if(!ok) throw new Error('Incorrect password.');
 
-    // Clerks must also supply the Depot ID their Marketing Assistant gave
+    // Supervisors must also supply the Depot ID their Manager gave
     // them along with the credentials, matched against the depotId the
     // account was created under - a second factor beyond username/
     // password, since a Clerk account is only ever meaningful tied to one
@@ -1956,7 +2041,7 @@ const AppAuth = {
     // this check doesn't apply to them.
     if(user.role === 'CLERK'){
       const enteredDepotId = (depotId||'').trim().toUpperCase();
-      if(!enteredDepotId) throw new Error('Enter the Depot ID your Marketing Assistant gave you.');
+      if(!enteredDepotId) throw new Error('Enter the Depot ID your Manager gave you.');
       if(enteredDepotId !== (user.depotId||'').toUpperCase()) throw new Error("That Depot ID doesn't match this account.");
     }
 
@@ -2101,7 +2186,7 @@ const AppAuth = {
   // a clerk already logged in elsewhere picks up the change on their next
   // login rather than immediately (see SPARK REVERT note above).
   async transferClerk(clerkUserId, newDepotId){
-    if(!this.isAssistant()) throw new Error('Only Marketing Assistants can transfer clerks.');
+    if(!this.isAssistant()) throw new Error('Only Managers can transfer supervisors.');
     const normalized = (newDepotId||'').trim().toUpperCase();
     if(!normalized) throw new Error('newDepotId cannot be empty.');
     if(!this.session.depotIds[normalized]) throw new Error('You must oversee the destination depot to transfer a clerk into it.');
@@ -2109,20 +2194,20 @@ const AppAuth = {
     return { clerkUserId, newDepotId: normalized };
   },
 
-  // Lets a Marketing Assistant create a Clerk login for one of the
+  // Lets a Manager create a Supervisor login for one of the
   // depots they oversee. This never touches the Assistant's own
   // session/localStorage - the new account is written straight to
   // satDepotManagerUsers and the MA stays signed in as themselves. The
   // MA is expected to relay the username/password/depotId to the clerk
   // out-of-band (WhatsApp, in person, etc.); there's no email delivery.
   async createClerkAccount({ name, username, password, depotId }){
-    if(!this.isAssistant()) throw new Error('Only Marketing Assistants can create Clerk logins.');
+    if(!this.isAssistant()) throw new Error('Only Managers can create Supervisor logins.');
     name = (name||'').trim(); username = (username||'').trim();
     if(!name || !username || !password) throw new Error('Fill in all fields.');
     if(password.length < 6) throw new Error('Password must be at least 6 characters.');
     const normalizedDepotId = (depotId||'').trim().toUpperCase();
     if(!normalizedDepotId) throw new Error('Choose a depot for this clerk.');
-    if(!this.session.depotIds[normalizedDepotId]) throw new Error('You must oversee this depot to create a clerk login for it.');
+    if(!this.session.depotIds[normalizedDepotId]) throw new Error('You must oversee this depot to create a supervisor login for it.');
 
     const existing = await _sdmFindByUsername(username);
     if(existing && !existing.user.deleted) throw new Error('That username is already taken.');
@@ -2591,6 +2676,11 @@ document.getElementById('tabs').addEventListener('click', e=>{
   const btn = e.target.closest('button[data-tab]');
   if(!btn) return;
   const tab = btn.dataset.tab;
+  if((tab === 'payroll' || tab === 'reports') && typeof AppAuth !== 'undefined' && AppAuth.isClerk && AppAuth.isClerk()){
+    toast('Payroll and Reports are only available to the Manager account');
+    closeDrawer();
+    return;
+  }
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
@@ -3081,14 +3171,23 @@ function renderFixedStaff(){
       left.appendChild(bankEl);
     }
     const right = document.createElement('div'); right.style.textAlign = 'right';
-    const salEl = document.createElement('div'); salEl.className = 'muted'; salEl.textContent = s.salary ? fmtK(s.salary)+'/mo' : '';
+    // Salary and cross-depot transfer are MA-only (PHASE 17 — see
+    // CloudSync financial-node split below): a CLERK's own session never
+    // has salary data to show in the first place once that split lands,
+    // but the UI hides it explicitly too rather than just rendering
+    // whatever happens to still be in local cache.
     const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:6px; margin-top:4px; justify-content:flex-end;';
-    const transferBtn = document.createElement('button'); transferBtn.className = 'btn';
-    transferBtn.dataset.fixedTransfer = s.id; transferBtn.textContent = 'Transfer';
+    if(AppAuth.isAssistant()){
+      const salEl = document.createElement('div'); salEl.className = 'muted'; salEl.textContent = s.salary ? fmtK(s.salary)+'/mo' : '';
+      const transferBtn = document.createElement('button'); transferBtn.className = 'btn';
+      transferBtn.dataset.fixedTransfer = s.id; transferBtn.textContent = 'Transfer';
+      btnRow.appendChild(transferBtn);
+      right.appendChild(salEl);
+    }
     const delBtn = document.createElement('button'); delBtn.className = 'btn-danger';
     delBtn.dataset.fixedDel = s.id; delBtn.textContent = 'Remove';
-    btnRow.appendChild(transferBtn); btnRow.appendChild(delBtn);
-    right.appendChild(salEl); right.appendChild(btnRow);
+    btnRow.appendChild(delBtn);
+    right.appendChild(btnRow);
     top.appendChild(left); top.appendChild(right); card.appendChild(top); frag.appendChild(card);
   });
   container.textContent = ''; container.appendChild(frag);
@@ -3159,6 +3258,7 @@ document.getElementById('fixedStaffForm').addEventListener('submit', e=>{
 let _transferStaffId = null;
 
 async function openTransferPanel(staffId){
+  if(!AppAuth.isAssistant()){ toast('Only the Manager account can transfer staff between depots'); return; }
   const staff = DB.staff.fixedStaff.find(s=>s.id === staffId);
   if(!staff) return;
   if(!CloudSync.configured){
@@ -3223,6 +3323,11 @@ async function transferFixedStaff(staffId, destDepotId, destLabel){
   const idx = DB.staff.fixedStaff.findIndex(s=>s.id === staffId);
   if(idx === -1) throw new Error('Staff record not found locally');
   const entry = Object.assign({}, DB.staff.fixedStaff[idx]);
+  // PHASE 17: salary never travels inside the destination's main blob -
+  // that node is readable by that depot's own CLERK sessions too. Carry
+  // it separately into the destination's financial node instead.
+  const salary = entry.salary || 0;
+  delete entry.salary;
 
   // Step 4: read-modify-write against the destination's own blob - same
   // pattern loadDepotRollup() uses for read-only cross-depot access.
@@ -3240,6 +3345,7 @@ async function transferFixedStaff(staffId, destDepotId, destLabel){
   destDB.staffTransferLog.push({ staffName: entry.name, staffId: entry.id, fromDepotId: CloudSync.depotId, toDepotId: destDepotId, direction: 'in', at: now });
 
   await CloudSync._request('satDepotManager/'+destDepotId, 'PUT', destDB);
+  await CloudSync._request('satDepotManagerFinancial/'+destDepotId+'/salaries/'+entry.id, 'PUT', salary);
 
   // Keep this device's offline cache of the destination depot in sync too,
   // if one exists - so switching there offline shows the new staff member
@@ -3824,8 +3930,8 @@ document.getElementById('genReportBtn').addEventListener('click', ()=>{
   const lines = [];
   lines.push('*SATELLITE DEPOT REPORT*');
   lines.push((s.depotName || '(depot name not set)') + ' \u2014 ' + (s.district||'') + ', ' + (s.province||''));
-  lines.push('MA: ' + (s.maName || '(not set)'));
-  if(s.maPhone) lines.push('MA WhatsApp: ' + s.maPhone);
+  lines.push('Manager: ' + (s.maName || '(not set)'));
+  if(s.maPhone) lines.push('Manager WhatsApp: ' + s.maPhone);
   lines.push('Period: ' + fmtDate(from) + ' to ' + fmtDate(to));
   lines.push('');
 
@@ -3926,7 +4032,7 @@ document.getElementById('genReportBtn').addEventListener('click', ()=>{
   }
   lines.push('');
   lines.push('Sent via Satellite Depot Manager');
-  if(s.maPhone) lines.push('MA Contact (WhatsApp): ' + s.maPhone);
+  if(s.maPhone) lines.push('Manager Contact (WhatsApp): ' + s.maPhone);
 
   document.getElementById('reportOutput').value = lines.join('\n');
   document.getElementById('reportOutputCard').style.display = 'block';
@@ -4211,7 +4317,7 @@ async function renderDepotSwitcher(){
   renderTransferClerkCard(entries);
 }
 
-/* ---- Create Clerk Login card: lets a Marketing Assistant create a new
+/* ---- Create Supervisor Login card: lets a Manager create a new
    Clerk account tied to one of the depots they oversee. Creating the
    login never signs this device into the new account - the Assistant
    stays signed in as themselves throughout. ---- */
@@ -4220,7 +4326,7 @@ async function renderCreateClerkCard(depotEntries){
   const form = document.getElementById('createClerkForm');
   if(!status || !form) return;
   if(!AppAuth.isAssistant() || !CloudSync.configured){
-    status.textContent = 'Sign in as a Marketing Assistant to create clerk logins.';
+    status.textContent = 'Sign in as a Manager to create supervisor logins.';
     form.style.display = 'none';
     return;
   }
@@ -4228,7 +4334,7 @@ async function renderCreateClerkCard(depotEntries){
   const entries = depotEntries || await DepotIndex.listEntries();
   const ids = Object.keys(entries);
   if(!ids.length){
-    status.textContent = 'Link or create a depot above before creating a clerk login for it.';
+    status.textContent = 'Link or create a depot above before creating a supervisor login for it.';
     form.style.display = 'none';
     return;
   }
@@ -4260,7 +4366,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
       document.getElementById('createClerkResultUsername').textContent = created.username;
       document.getElementById('createClerkResultDepotId').textContent = created.depotId;
       resultBox.style.display = '';
-      toast('Clerk login created.');
+      toast('Supervisor login created.');
     }catch(e){
       err.textContent = e.message || 'Could not create clerk login.';
       err.classList.add('show');
@@ -4279,7 +4385,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   });
 });
 
-/* ---- Transfer Clerk card: lets a Marketing Assistant move a clerk from
+/* ---- Transfer Supervisor card: lets a Manager move a supervisor from
    the currently-active depot to any other depot in their own list, via
    the transferClerkToDepot Cloud Function. Only ever shown for the
    ASSISTANT role (multiDepotCards is hidden entirely for CLERK). ---- */
@@ -4288,7 +4394,7 @@ async function renderTransferClerkCard(depotEntries){
   const form = document.getElementById('transferClerkForm');
   if(!status || !form) return;
   if(!AppAuth.isAssistant() || !CloudSync.configured || !CloudSync.depotId){
-    status.textContent = 'Switch to a depot first to transfer its clerks.';
+    status.textContent = 'Switch to a depot first to transfer its supervisors.';
     form.style.display = 'none';
     return;
   }
@@ -4302,13 +4408,13 @@ async function renderTransferClerkCard(depotEntries){
   ]);
 
   if(!clerks.length){
-    status.textContent = 'No clerks are currently assigned to this depot.';
+    status.textContent = 'No supervisors are currently assigned to this depot.';
     return;
   }
 
   const destIds = Object.keys(entries).filter(id=> id !== CloudSync.depotId);
   if(!destIds.length){
-    status.textContent = 'Link another depot above before transferring clerks into it.';
+    status.textContent = 'Link another depot above before transferring supervisors into it.';
     return;
   }
 
@@ -4333,15 +4439,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const newDepotId = destSelect.value;
     const destLabel = destSelect.options[destSelect.selectedIndex]?.textContent || newDepotId;
     if(!clerkUserId || !newDepotId) return;
-    if(!confirm(`Move this clerk to ${destLabel}? They'll see ${destLabel}'s data next time they open the app.`)) return;
+    if(!confirm(`Move this supervisor to ${destLabel}? They'll see ${destLabel}'s data next time they open the app.`)) return;
     btn.disabled = true;
     btn.textContent = 'Transferring…';
     try{
       await AppAuth.transferClerk(clerkUserId, newDepotId);
       await renderTransferClerkCard();
-      alert('Clerk transferred.');
+      alert('Supervisor transferred.');
     }catch(e){
-      alert('Could not transfer clerk: ' + (e.message || 'please try again.'));
+      alert('Could not transfer supervisor: ' + (e.message || 'please try again.'));
     }finally{
       btn.disabled = false;
       btn.textContent = 'Transfer';
@@ -4644,8 +4750,8 @@ function initAll(){
    CLERK: locked to one depot, so the multi-depot switcher/roll-up and the
    "link/create a different cloud depot" controls don't apply to them. */
 // Brandbar pill showing which kind of account is currently signed in on
-// this device - MA (Marketing Assistant, can hold/switch between several
-// depots) or SDC (Satellite Depot Clerk, pinned to one depot). Cheap way
+// this device - Manager (can hold/switch between several
+// depots) or Supervisor (pinned to one depot). Cheap way
 // to catch "wait, whose account am I in right now?" before it causes a
 // mix-up, especially on shared devices.
 function updateRoleBadge(){
@@ -4655,12 +4761,12 @@ function updateRoleBadge(){
   el.style.display = '';
   el.classList.remove('role-ma', 'role-sdc');
   if(AppAuth.isAssistant()){
-    el.textContent = 'MA';
-    el.title = 'Signed in as Marketing Assistant';
+    el.textContent = 'MGR';
+    el.title = 'Signed in as Manager';
     el.classList.add('role-ma');
   } else {
-    el.textContent = 'SDC';
-    el.title = 'Signed in as Satellite Depot Clerk';
+    el.textContent = 'SUP';
+    el.title = 'Signed in as Supervisor';
     el.classList.add('role-sdc');
   }
 }
