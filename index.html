@@ -1783,10 +1783,92 @@ const CloudSync = {
    at all, since nothing outside the Admin SDK can write
    satDepotManagerSessions - the residual gap PHASE 12 left open is now
    fully closed.
+
+   *** SUPERSEDED - see SPARK REVERT below ***. Cloud Functions require the
+   Blaze plan; this project went back to Spark, so PHASE 13's design no
+   longer applies. AppAuth._callFunction referenced above no longer exists -
+   login/signup/link/unlink/reset/transfer are back to direct client RTDB
+   calls, and satDepotManagerUsers/satDepotManagerSessions are back to the
+   PHASE 10/12-style client-accessible (validated) rules, not deny-all.
    ========================================================================= */
 const SDM_SESSION_KEY = 'sdmSession_v1';
-const SDM_FUNCTIONS_REGION = 'us-central1'; // default region for the onCall functions in index.js
-const SDM_FUNCTIONS_BASE = `https://${SDM_FUNCTIONS_REGION}-${FIREBASE_CONFIG.projectId}.cloudfunctions.net`;
+
+/* ===================== SPARK REVERT — client-side auth, no Cloud Functions =====================
+   Reverts sdmLogin/sdmSignup/sdmSetRecoveryEmail/sdmResetPasswordWithEmail/
+   linkDepotForAssistant/unlinkDepotForAssistant/transferClerkToDepot/
+   listClerksInDepot away from Cloud Functions (Blaze-only) back onto direct
+   RTDB reads/writes from the client (Spark-compatible) - the same shape as
+   the PHASE 10/12 design these functions replaced. index.js is no longer
+   deployed; keep it in the repo only as a reference for the validation
+   logic replicated here.
+
+   What this trades away vs. the Cloud Functions version (accepted, and
+   consistent with tradeoffs the legacy "users" node already carries):
+   - satDepotManagerUsers is readable by any signed-in (anonymous-auth)
+     session, same as the legacy "users" node - the account directory
+     (usernames/names/roles/depotId assignments, and password hashes+salts)
+     is not private from other logged-in devices, just brute-force-hard.
+   - Signup's username-uniqueness check is read-then-write, not atomic - a
+     rare double-signup race is possible, same as the legacy node.
+   - Password reset no longer force-logs-out other signed-in devices for
+     that account (doing so would require satDepotManagerSessions to be
+     broadly readable, a bigger gap than this is worth).
+   - transferClerkToDepot only updates the clerk's account record now; a
+     clerk already logged in elsewhere picks up the new depot on their next
+     login, not immediately.
+   =================================================================================================== */
+const SDM_PBKDF2_ITERATIONS = 100000; // must match whatever hashed any existing passwordHash values
+
+async function _sdmPbkdf2Hex(password, saltHex){
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), {name:'PBKDF2'}, false, ['deriveBits']);
+  const saltBytes = new Uint8Array((saltHex.match(/.{1,2}/g)||[]).map(b=> parseInt(b,16)));
+  const bits = await crypto.subtle.deriveBits({name:'PBKDF2', hash:'SHA-256', salt: saltBytes, iterations: SDM_PBKDF2_ITERATIONS}, keyMaterial, 256);
+  return Array.from(new Uint8Array(bits)).map(b=> b.toString(16).padStart(2,'0')).join('');
+}
+
+// GET with RTDB REST query params (orderBy/equalTo/limitToFirst) - same
+// timeout/retry budget style as CloudSync._request, which only handles
+// plain path GET/PUT/PATCH/DELETE without a query string.
+async function _sdmRtdbGet(path, query){
+  const budget = networkBudget();
+  const token = await CloudSync._authToken();
+  const base = FIREBASE_CONFIG.databaseURL.replace(/\/$/, '');
+  const params = new URLSearchParams(query || {});
+  if(token) params.set('auth', token);
+  const url = `${base}/${path}.json?${params.toString()}`;
+  let attempt = 0;
+  for(;;){
+    const controller = new AbortController();
+    const timer = setTimeout(()=> controller.abort(), budget.timeoutMs);
+    try{
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if(!res.ok){
+        const permissionDenied = res.status === 401 || res.status === 403;
+        throw Object.assign(new Error('RTDB GET failed: '+res.status), { retryable: res.status >= 500, permissionDenied });
+      }
+      return res.status === 204 ? null : await res.json();
+    }catch(e){
+      clearTimeout(timer);
+      const retryable = e.name === 'AbortError' || e.retryable !== false;
+      if(!retryable || attempt >= budget.retries) throw e;
+      attempt++;
+      await new Promise(r=> setTimeout(r, Math.min(800*2**(attempt-1), 2500)));
+    }
+  }
+}
+
+async function _sdmFindByUsername(username){
+  const result = await _sdmRtdbGet('satDepotManagerUsers', {
+    orderBy: JSON.stringify('username'),
+    equalTo: JSON.stringify(username),
+    limitToFirst: '1'
+  });
+  if(!result) return null;
+  const [id, user] = Object.entries(result)[0];
+  return { id, user };
+}
 
 const AppAuth = {
   session: null, // { userId, username, name, role, depotId, depotIds }
@@ -1801,62 +1883,37 @@ const AppAuth = {
 
   isAssistant(){ return !!this.session && this.session.role === 'ASSISTANT'; },
   isClerk(){ return !!this.session && this.session.role === 'CLERK'; },
-
-  // Minimal callable-Cloud-Function fetch helper - index.html only loads
-  // firebase-app + firebase-auth (no Functions SDK), so this speaks the
-  // callable-function HTTPS protocol directly instead of pulling in
-  // another bundle: POST {data} with an Authorization: Bearer <idToken>
-  // header, same timeout/retry budget style as the old _rtdb had.
-  async _callFunction(name, data){
-    const budget = networkBudget();
-    const token = await CloudSync._authToken();
-    const url = `${SDM_FUNCTIONS_BASE}/${name}`;
-    let attempt = 0;
-    for(;;){
-      const controller = new AbortController();
-      const timer = setTimeout(()=> controller.abort(), budget.timeoutMs);
-      try{
-        const res = await fetch(url, {
-          method: 'POST',
-          signal: controller.signal,
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': 'Bearer '+token } : {})
-          },
-          body: JSON.stringify({ data })
-        });
-        clearTimeout(timer);
-        const json = await res.json().catch(()=> ({}));
-        if(!res.ok || json.error){
-          const err = json.error || {};
-          const permissionDenied = err.status === 'PERMISSION_DENIED' || err.status === 'UNAUTHENTICATED' || res.status === 401 || res.status === 403;
-          throw Object.assign(new Error(err.message || (name+' failed: '+res.status)), {
-            retryable: !permissionDenied && res.status >= 500,
-            permissionDenied
-          });
-        }
-        return json.result;
-      }catch(e){
-        clearTimeout(timer);
-        const retryable = e.name === 'AbortError' || e.retryable !== false;
-        if(!retryable || attempt >= budget.retries) throw e;
-        attempt++;
-        await new Promise(r=> setTimeout(r, Math.min(800*2**(attempt-1), 2500)));
-      }
-    }
-  },
-
   async login(username, password){
     username = (username||'').trim();
     if(!username || !password) throw new Error('Enter your username and password.');
-    // sdmLogin verifies the password and writes the session pointer
-    // server-side (Admin SDK) before returning - nothing left to do here
-    // but store what it hands back.
-    const result = await this._callFunction('sdmLogin', { username, password });
+    const found = await _sdmFindByUsername(username);
+    if(!found || found.user.deleted) throw new Error('No account found with that username.');
+    const { id, user } = found;
+
+    let ok = false;
+    if(user.passwordHash && user.salt){
+      ok = (await _sdmPbkdf2Hex(password, user.salt)) === user.passwordHash;
+    }else if(user.password !== undefined){
+      // Legacy plaintext record - verify the old way, then migrate to a
+      // hash right now so a successful login is also the moment plaintext
+      // stops existing for this account.
+      ok = user.password === password;
+      if(ok){
+        const salt = _sdmRandomSaltHex();
+        const passwordHash = await _sdmPbkdf2Hex(password, salt);
+        await CloudSync._request(`satDepotManagerUsers/${id}`, 'PATCH', { passwordHash, salt, password: null });
+      }
+    }
+    if(!ok) throw new Error('Incorrect password.');
+
+    const authUser = await CloudSync.authReady;
+    const session = { userId: id, role: user.role, depotId: user.depotId || null, depotIds: user.depotIds || {} };
+    await CloudSync._request(`satDepotManagerSessions/${authUser.uid}`, 'PUT', session);
+
     this.session = {
-      userId: result.userId, username: result.username, name: result.name, role: result.role,
-      depotId: result.depotId || null,
-      depotIds: result.depotIds || {}
+      userId: id, username: user.username, name: user.name, role: user.role,
+      depotId: user.depotId || null,
+      depotIds: user.depotIds || {}
     };
     this.saveLocalSession();
     return this.session;
@@ -1866,50 +1923,88 @@ const AppAuth = {
     name = (name||'').trim(); username = (username||'').trim();
     if(!name || !username || !password) throw new Error('Fill in all fields.');
     if(password.length < 6) throw new Error('Password must be at least 6 characters.');
+    if(role !== 'CLERK' && role !== 'ASSISTANT') throw new Error('Invalid role.');
     if(role === 'CLERK' && !(depotCode||'').trim()) throw new Error('Enter the depot code your depot uses.');
-    // sdmSignup does the username-uniqueness check, hashes the password,
-    // and writes the session pointer, all server-side.
-    const result = await this._callFunction('sdmSignup', { name, username, password, role, depotCode, email });
+    const normalizedEmail = (email||'').trim().toLowerCase();
+    if(normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) throw new Error("That doesn't look like a valid email address.");
+
+    // Read-then-write uniqueness check - not atomic, same tradeoff the
+    // legacy "users" node already carries (a rare double-signup race is
+    // possible; acceptable for a small internal-team tool).
+    const existing = await _sdmFindByUsername(username);
+    if(existing && !existing.user.deleted) throw new Error('That username is already taken.');
+
+    const salt = _sdmRandomSaltHex();
+    const passwordHash = await _sdmPbkdf2Hex(password, salt);
+    const record = { name, username, passwordHash, salt, role, createdAt: firebase.database.ServerValue.TIMESTAMP };
+    if(role === 'CLERK') record.depotId = depotCode.trim().toUpperCase();
+    else record.depotIds = {};
+    if(normalizedEmail) record.email = normalizedEmail;
+
+    const pushResult = await CloudSync._request('satDepotManagerUsers', 'POST', record);
+    const newId = pushResult.name;
+
+    const authUser = await CloudSync.authReady;
+    const session = { userId: newId, role, depotId: record.depotId || null, depotIds: record.depotIds || {} };
+    await CloudSync._request(`satDepotManagerSessions/${authUser.uid}`, 'PUT', session);
+
     this.session = {
-      userId: result.userId, username: result.username, name: result.name, role: result.role,
-      depotId: result.depotId || null,
-      depotIds: result.depotIds || {}
+      userId: newId, username, name, role,
+      depotId: record.depotId || null,
+      depotIds: record.depotIds || {}
     };
     this.saveLocalSession();
     return this.session;
   },
 
   // Adds or changes the recovery email on the currently signed-in
-  // account. Server re-resolves the account from the session pointer,
-  // so this can never be pointed at someone else's account.
+  // account. Writes directly to the caller's own record - the RTDB rule
+  // checks the write comes from the session matching this userId, so it
+  // can never be pointed at someone else's account.
   async setRecoveryEmail(email){
-    return await this._callFunction('sdmSetRecoveryEmail', { email });
+    const normalizedEmail = (email||'').trim().toLowerCase();
+    if(!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) throw new Error('Enter a valid email address.');
+    if(!this.session) throw new Error('Sign in first.');
+    await CloudSync._request(`satDepotManagerUsers/${this.session.userId}/email`, 'PUT', normalizedEmail);
+    return { email: normalizedEmail };
   },
 
-  // No emailed code involved - the server checks the submitted email
-  // against the one on file for that username and, if it matches, sets
-  // the new password directly. See sdmResetPasswordWithEmail server-side
-  // for the tradeoff this simplicity carries.
+  // No emailed code involved - checks the submitted email against the one
+  // on file for that username and, if it matches, sets the new password
+  // directly. `recoveryEmailConfirm` is what proves the match to the RTDB
+  // rule (which can't otherwise "see" that this caller knows the email on
+  // file) - same tradeoff as before: anyone who knows both the username
+  // and the recovery email can reset that account's password. Unlike the
+  // Cloud Functions version, this no longer force-logs-out other signed-in
+  // devices for the account (see SPARK REVERT note above).
   async resetPasswordWithEmail(username, recoveryEmail, newPassword){
     if(!newPassword || newPassword.length < 6) throw new Error('Password must be at least 6 characters.');
-    return await this._callFunction('sdmResetPasswordWithEmail', { username, recoveryEmail, newPassword });
+    const uname = (username||'').trim();
+    const email = (recoveryEmail||'').trim().toLowerCase();
+    const noMatch = ()=> new Error("Username and recovery email don't match our records.");
+    if(!uname || !email) throw noMatch();
+
+    const found = await _sdmFindByUsername(uname);
+    if(!found || found.user.deleted || !found.user.email || found.user.email !== email) throw noMatch();
+
+    const salt = _sdmRandomSaltHex();
+    const passwordHash = await _sdmPbkdf2Hex(newPassword, salt);
+    await CloudSync._request(`satDepotManagerUsers/${found.id}`, 'PATCH', { passwordHash, salt, recoveryEmailConfirm: email });
+    return { status: 'reset' };
   },
 
   // Persists a depotId into the logged-in Assistant's own account record
-  // via linkDepotForAssistant, so their linked-depot list follows them
-  // across devices/logins instead of only living in this device's local
-  // DepotIndex cache. The function also refreshes the session pointer to
-  // match (Admin SDK) - the RTDB rule checks the session pointer, not the
-  // account record, so without that a newly linked depot would be denied
-  // until next login.
+  // and mirrors it onto their own session pointer - both writes are
+  // owner-gated by the RTDB rule (session.userId must match this record).
   async rememberDepotForAssistant(depotId){
     if(!this.isAssistant() || !depotId) return;
     this.session.depotIds[depotId] = true;
     this.saveLocalSession();
     if(!CloudSync.configured) return;
     try{
-      const result = await this._callFunction('linkDepotForAssistant', { depotId });
-      if(result && result.depotIds){ this.session.depotIds = result.depotIds; this.saveLocalSession(); }
+      await CloudSync._request(`satDepotManagerUsers/${this.session.userId}/depotIds/${depotId}`, 'PUT', true);
+      const authUser = await CloudSync.authReady;
+      await CloudSync._request(`satDepotManagerSessions/${authUser.uid}/depotIds`, 'PUT', this.session.depotIds);
     }catch(e){ console.warn('Assistant depot-list sync failed, kept locally:', e); }
   },
   async forgetDepotForAssistant(depotId){
@@ -1918,29 +2013,46 @@ const AppAuth = {
     this.saveLocalSession();
     if(!CloudSync.configured) return;
     try{
-      const result = await this._callFunction('unlinkDepotForAssistant', { depotId });
-      if(result && result.depotIds){ this.session.depotIds = result.depotIds; this.saveLocalSession(); }
+      await CloudSync._request(`satDepotManagerUsers/${this.session.userId}/depotIds/${depotId}`, 'DELETE');
+      const authUser = await CloudSync.authReady;
+      const depotIdsPayload = Object.keys(this.session.depotIds).length ? this.session.depotIds : null;
+      await CloudSync._request(`satDepotManagerSessions/${authUser.uid}/depotIds`, 'PUT', depotIdsPayload);
     }catch(e){ console.warn('Assistant depot-list sync failed, kept locally:', e); }
   },
 
   // Lists the CLERK accounts pointing at a given depot, for the "Transfer
-  // Clerk" card below - only ever called for depots already in the
-  // Assistant's own depotIds, but listClerksInDepot re-checks that
-  // server-side anyway (never trust the client-side gate alone).
+  // Clerk" card below - a direct indexed RTDB query now rather than a
+  // Cloud Function, filtered client-side for role/deleted (satDepotManagerUsers
+  // is readable by any signed-in session, so no separate oversight check
+  // is enforced server-side here anymore - only ever call this for depots
+  // already in the Assistant's own depotIds).
   async listClerksInDepot(depotId){
     if(!this.isAssistant() || !depotId || !CloudSync.configured) return [];
     try{
-      const result = await this._callFunction('listClerksInDepot', { depotId });
-      return (result && result.clerks) || [];
+      const result = await _sdmRtdbGet('satDepotManagerUsers', {
+        orderBy: JSON.stringify('depotId'),
+        equalTo: JSON.stringify(depotId)
+      });
+      if(!result) return [];
+      return Object.entries(result)
+        .filter(([, v])=> v.role === 'CLERK' && !v.deleted)
+        .map(([id, v])=> ({ userId: id, name: v.name, username: v.username }));
     }catch(e){ console.warn('listClerksInDepot failed:', e); return []; }
   },
 
   // Moves a clerk's single depotId to a different depot the Assistant
-  // also oversees. transferClerkToDepot enforces the oversight check on
-  // both the old and new depot server-side - this is just the fetch call.
+  // also oversees - the RTDB rule for satDepotManagerUsers/$userId/depotId
+  // enforces that the caller's own session lists both the clerk's current
+  // depotId and the destination depotId. Only updates the account record;
+  // a clerk already logged in elsewhere picks up the change on their next
+  // login rather than immediately (see SPARK REVERT note above).
   async transferClerk(clerkUserId, newDepotId){
     if(!this.isAssistant()) throw new Error('Only Marketing Assistants can transfer clerks.');
-    return await this._callFunction('transferClerkToDepot', { clerkUserId, newDepotId });
+    const normalized = (newDepotId||'').trim().toUpperCase();
+    if(!normalized) throw new Error('newDepotId cannot be empty.');
+    if(!this.session.depotIds[normalized]) throw new Error('You must oversee the destination depot to transfer a clerk into it.');
+    await CloudSync._request(`satDepotManagerUsers/${clerkUserId}/depotId`, 'PUT', normalized);
+    return { clerkUserId, newDepotId: normalized };
   },
 
   logout(){
