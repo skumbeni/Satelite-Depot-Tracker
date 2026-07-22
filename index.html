@@ -1936,7 +1936,7 @@ const AppAuth = {
 
     const salt = _sdmRandomSaltHex();
     const passwordHash = await _sdmPbkdf2Hex(password, salt);
-    const record = { name, username, passwordHash, salt, role, createdAt: firebase.database.ServerValue.TIMESTAMP };
+    const record = { name, username, passwordHash, salt, role, createdAt: Date.now() };
     if(role === 'CLERK') record.depotId = depotCode.trim().toUpperCase();
     else record.depotIds = {};
     if(normalizedEmail) record.email = normalizedEmail;
