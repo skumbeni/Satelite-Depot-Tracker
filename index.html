@@ -518,6 +518,7 @@
       <button type="button" class="lock-empty" tabindex="-1"></button><button type="button" data-k="0">0</button><button type="button" data-k="back">⌫</button>
     </div>
     <div class="lock-error" id="lockError"></div>
+    <a class="lock-signout" id="lockForgotPinLink" style="margin-top:8px;">Forgot PIN?</a>
     <a class="lock-signout" id="lockSignOutLink">Not you? Sign out</a>
     <a class="lock-signout" id="lockCancelLink" style="display:none;">Cancel</a>
   </div>
@@ -4762,9 +4763,14 @@ function bootApp(){
   const sub = document.getElementById('lockSub');
   const signOutLink = document.getElementById('lockSignOutLink');
   const cancelLink = document.getElementById('lockCancelLink');
+  const forgotLink = document.getElementById('lockForgotPinLink');
   let entry = '';
   let mode = 'unlock'; // 'unlock' | 'setup' | 'confirm'
   let firstPin = '';
+  // Set true only when 'setup'/'confirm' was entered via the Forgot-PIN
+  // path below, so submitEntry() knows to fully unlock the screen on
+  // success instead of just closing a voluntary "change PIN" dialog.
+  let viaForgotPin = false;
 
   function renderDots(){
     dots.forEach((d,i)=> d.classList.toggle('filled', i < entry.length));
@@ -4779,11 +4785,12 @@ function bootApp(){
     entry = ''; renderDots();
   }
   function resetToUnlockMode(){
-    mode = 'unlock'; entry = ''; firstPin = '';
+    mode = 'unlock'; entry = ''; firstPin = ''; viaForgotPin = false;
     title.textContent = 'Enter your PIN';
     sub.textContent = 'Satellite Depot Manager was locked after a period of inactivity.';
     cancelLink.style.display = 'none';
     signOutLink.style.display = '';
+    forgotLink.style.display = '';
     err.classList.remove('show');
     renderDots();
   }
@@ -4803,7 +4810,7 @@ function bootApp(){
       if(entry === firstPin){
         try{
           await ScreenLock.setupPin(entry);
-          gate.classList.remove('show');
+          if(viaForgotPin){ ScreenLock.unlock(); } else { gate.classList.remove('show'); }
           resetToUnlockMode();
           toast('Lock PIN set.');
         }catch(e){ showError(e.message || 'Could not save PIN.'); }
@@ -4838,14 +4845,47 @@ function bootApp(){
 
   document.getElementById('setLockPinBtn').addEventListener('click', ()=>{
     if(!AppAuth.session){ toast('Sign in first.'); return; }
-    mode = 'setup'; firstPin = ''; entry = '';
+    mode = 'setup'; firstPin = ''; entry = ''; viaForgotPin = false;
     title.textContent = 'Set a Lock PIN';
     sub.textContent = 'Choose 4 digits to lock this device.';
     cancelLink.style.display = '';
     signOutLink.style.display = 'none';
+    forgotLink.style.display = 'none';
     err.classList.remove('show');
     renderDots();
     gate.classList.add('show');
+  });
+
+  // Forgot PIN: only shown on the enforced lock screen (not during the
+  // voluntary "Set Lock PIN" flow above). Verifies the email the user
+  // types against the recovery email already on file for this account
+  // (AppAuth.session.userId is known even while the screen is locked -
+  // ScreenLock only gates the screen, not the underlying session), then
+  // drops straight into the same setup/confirm flow used to create a PIN.
+  forgotLink.addEventListener('click', async ()=>{
+    if(!AppAuth.session){ toast('Sign in first.'); return; }
+    if(!CloudSync.configured){ toast('Forgot PIN needs an internet connection to check your recovery email.'); return; }
+    const typed = (prompt('Enter the recovery email on file for this account:') || '').trim().toLowerCase();
+    if(!typed) return;
+    let onFile;
+    try{
+      onFile = await CloudSync._request(`satDepotManagerUsers/${AppAuth.session.userId}/email`, 'GET');
+    }catch(e){
+      toast(e.message || 'Could not check that email right now.');
+      return;
+    }
+    if(!onFile || String(onFile).trim().toLowerCase() !== typed){
+      toast("That doesn't match the recovery email on file.");
+      return;
+    }
+    mode = 'setup'; firstPin = ''; entry = ''; viaForgotPin = true;
+    title.textContent = 'Set a new PIN';
+    sub.textContent = 'Email verified — choose a new 4-digit PIN.';
+    cancelLink.style.display = 'none';
+    signOutLink.style.display = 'none';
+    forgotLink.style.display = 'none';
+    err.classList.remove('show');
+    renderDots();
   });
   document.getElementById('setRecoveryEmailBtn').addEventListener('click', async ()=>{
     if(!AppAuth.session){ toast('Sign in first.'); return; }
