@@ -4686,6 +4686,24 @@ async function bootAfterAuth(){
       persistLocal();
     }
   }
+  // BUGFIX: at this point CloudSync.depotId is pointing at the correct
+  // depot for this account, but DB itself may still hold whatever the
+  // flat, unscoped STORAGE_KEY happened to contain from module load
+  // (typically the previous account's on-screen data, if a different
+  // account was last active on this device). switchActiveDepot() already
+  // repaints from the target depot's own scoped cache before the network
+  // pull lands; do the same thing here so a login doesn't briefly (or,
+  // if offline, indefinitely) show a stale foreign depot's data.
+  if(CloudSync.depotId){
+    const cachedRaw = localStorage.getItem(depotStorageKey(CloudSync.depotId));
+    if(cachedRaw){
+      try{
+        DB = normalizeDB(JSON.parse(cachedRaw));
+        invalidateMemo();
+        persistLocal(); // so a reload before the network pull lands still sees the right depot
+      }catch(e){ console.warn('Cached snapshot for this depot was corrupt, ignoring:', e); }
+    }
+  }
   initAll();
   applyRoleUI();
   ScreenLock.init();
