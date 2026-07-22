@@ -1317,21 +1317,29 @@ const DEPOT_MANAGER_INDEX_ROOT = 'depotManagers';
 const DEPOT_INDEX_CACHE_KEY = 'satDepotManagerIndex_v1'; // local mirror so the switcher renders offline
 
 const DepotIndex = {
-  // Resolves once anonymous auth has produced a UID. Returns null if
-  // CloudSync isn't configured/authed yet (e.g. FIREBASE_CONFIG not set).
+  // PHASE 16: keyed by the logged-in AppAuth account (satDepotManagerUsers
+  // userId), not the device's anonymous-auth UID. The anonymous UID is
+  // shared by every AppAuth account that ever logs into this device/
+  // browser, so keying on it made every account see every other account's
+  // depot list. Returns null if nobody is signed in yet.
   async managerId(){
-    if(!CloudSync.authReady) return null;
-    const user = await CloudSync.authReady;
-    return user ? user.uid : null;
+    return (typeof AppAuth !== 'undefined' && AppAuth.session) ? AppAuth.session.userId : null;
   },
 
   // Path helpers.
   rootPath(managerId){ return `${DEPOT_MANAGER_INDEX_ROOT}/${managerId}/depots`; },
   entryPath(managerId, depotId){ return `${DEPOT_MANAGER_INDEX_ROOT}/${managerId}/depots/${depotId}`; },
 
-  /* ---- PHASE 9 STEP 2 — linking depots into the manager's index ---- */
-  _cache(){ try{ return JSON.parse(localStorage.getItem(DEPOT_INDEX_CACHE_KEY) || '{}'); }catch(e){ return {}; } },
-  _saveCache(entries){ try{ localStorage.setItem(DEPOT_INDEX_CACHE_KEY, JSON.stringify(entries||{})); }catch(e){} },
+  /* ---- PHASE 9 STEP 2 — linking depots into the manager's index ----
+     PHASE 16: local cache key is namespaced per managerId so switching
+     AppAuth accounts on the same device doesn't show the previous
+     account's cached list before the cloud pull completes (or at all,
+     if offline). Falls back to a shared 'anon' bucket if called before
+     anyone's logged in - that bucket is never linked to any account's
+     cloud data, it just avoids a crash. */
+  _cacheKey(managerId){ return `${DEPOT_INDEX_CACHE_KEY}:${managerId || 'anon'}`; },
+  _cache(managerId){ try{ return JSON.parse(localStorage.getItem(this._cacheKey(managerId)) || '{}'); }catch(e){ return {}; } },
+  _saveCache(managerId, entries){ try{ localStorage.setItem(this._cacheKey(managerId), JSON.stringify(entries||{})); }catch(e){} },
 
   // Registers a depot in this manager's index WITHOUT changing which depot
   // is currently active on this device (that's a separate action, see
@@ -1340,13 +1348,13 @@ const DepotIndex = {
   // an already-listed depot just refreshes its label/timestamp.
   async addEntry(depotId, label){
     if(!depotId) return;
-    const cache = this._cache();
+    const managerId = await this.managerId();
+    if(!managerId) return; // not signed in yet - nothing to attribute this entry to
+    const cache = this._cache(managerId);
     const entry = { label: (label||'').trim() || depotId, addedAt: (cache[depotId] && cache[depotId].addedAt) || Date.now() };
     cache[depotId] = entry;
-    this._saveCache(cache); // local write always lands first, same pattern as depot data itself
+    this._saveCache(managerId, cache); // local write always lands first, same pattern as depot data itself
     if(!CloudSync.configured) return;
-    const managerId = await this.managerId();
-    if(!managerId) return;
     try{ await CloudSync._request(this.entryPath(managerId, depotId), 'PUT', entry); }
     catch(e){ console.warn('Depot-index entry kept locally, cloud sync will catch up later:', e); }
   },
@@ -1355,12 +1363,12 @@ const DepotIndex = {
   // actual data at satDepotManager/{depotId} - this only removes the
   // pointer, and only from this manager's index.
   async removeEntry(depotId){
-    const cache = this._cache();
-    delete cache[depotId];
-    this._saveCache(cache);
-    if(!CloudSync.configured) return;
     const managerId = await this.managerId();
     if(!managerId) return;
+    const cache = this._cache(managerId);
+    delete cache[depotId];
+    this._saveCache(managerId, cache);
+    if(!CloudSync.configured) return;
     try{ await CloudSync._request(this.entryPath(managerId, depotId), 'DELETE'); }
     catch(e){ console.warn('Depot-index removal kept locally, cloud sync will catch up later:', e); }
   },
@@ -1368,16 +1376,15 @@ const DepotIndex = {
   // Cloud-first with local-cache fallback, so the switcher list still
   // renders (from last-known state) when offline.
   async listEntries(){
+    const managerId = await this.managerId();
+    if(!managerId) return {}; // nobody signed in - nothing to show
     if(CloudSync.configured){
-      const managerId = await this.managerId();
-      if(managerId){
-        try{
-          const remote = await CloudSync._request(this.rootPath(managerId), 'GET');
-          if(remote){ this._saveCache(remote); return remote; }
-        }catch(e){ console.warn('Depot index pull failed, showing last-cached list:', e); }
-      }
+      try{
+        const remote = await CloudSync._request(this.rootPath(managerId), 'GET');
+        if(remote){ this._saveCache(managerId, remote); return remote; }
+      }catch(e){ console.warn('Depot index pull failed, showing last-cached list:', e); }
     }
-    return this._cache();
+    return this._cache(managerId);
   }
 };
 
