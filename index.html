@@ -559,13 +559,13 @@
     <span class="drawer-brand">Menu</span>
     <button class="drawer-close" id="drawerCloseBtn" aria-label="Close menu">✕</button>
   </div>
-  <button data-tab="dashboard" class=""><span class="di">📊</span>Dashboard</button>
+  <button data-tab="dashboard" class="active"><span class="di">📊</span>Dashboard</button>
   <button data-tab="grain"><span class="di">🌾</span>Grain</button>
   <button data-tab="equipment"><span class="di">🧰</span>Equipment and Requisites</button>
   <button data-tab="staff"><span class="di">👥</span>Staff</button>
   <button data-tab="payroll" class=""><span class="di">💵</span>Payroll</button>
   <button data-tab="reports" class=""><span class="di">📋</span>Reports</button>
-  <button data-tab="settings" class="active"><span class="di">⚙️</span>Settings</button>
+  <button data-tab="settings" class=""><span class="di">⚙️</span>Settings</button>
   <button type="button" id="setRecoveryEmailBtn" style="margin-top:auto;"><span class="di">✉️</span>Recovery Email</button>
   <button type="button" id="biometricLoginBtn"><span class="di">👆</span>Biometric Login</button>
   <button type="button" id="setLockPinBtn"><span class="di">🔒</span>Set Lock PIN</button>
@@ -575,7 +575,7 @@
 <div class="container" style="margin-top:14px;">
 
   <!-- DASHBOARD -->
-  <div class="tabpanel" id="tab-dashboard">
+  <div class="tabpanel active" id="tab-dashboard">
     <div class="card">
       <h2>Grain Balances</h2>
       <div id="dashGrain"><table><thead><tr><th>Crop</th><th>Purchased</th><th>Dispatched</th><th>Balance</th></tr></thead><tbody><tr><td>Maize</td><td>0</td><td>0</td><td><b>0</b></td></tr><tr><td>Soyabeans</td><td>0</td><td>0</td><td><b>0</b></td></tr><tr><td>Rice</td><td>0</td><td>0</td><td><b>0</b></td></tr></tbody></table></div>
@@ -881,7 +881,7 @@
   </div>
 
   <!-- SETTINGS -->
-  <div class="tabpanel active" id="tab-settings">
+  <div class="tabpanel" id="tab-settings">
     <div class="card">
       <h2>Depot Details</h2>
       <form id="settingsForm">
@@ -2064,6 +2064,13 @@ const AppAuth = {
 
   logout(){
     this.clearLocalSession();
+    // BUGFIX: CloudSync.depotId lives in its own unscoped localStorage key
+    // (satDepotId_v1) and was never cleared here - so whichever depot was
+    // active for THIS account stuck around in localStorage and got pulled
+    // straight into the NEXT account that logs in on this device, before
+    // that account ever picks a depot of its own. Clearing it on logout
+    // closes that leak at the source.
+    if(typeof CloudSync !== 'undefined') CloudSync.clearDepotId();
     document.body.classList.remove('editing-locked');
     window.location.reload(); // simplest clean-slate reset back to the login gate
   }
@@ -4519,6 +4526,27 @@ async function bootAfterAuth(){
       if(!cache[id]) cache[id] = { label: id, addedAt: Date.now() };
     });
     DepotIndex._saveCache(cache);
+
+    // BUGFIX: CloudSync.depotId is a single unscoped localStorage value
+    // (satDepotId_v1), not namespaced per account the way DepotIndex's
+    // cache is. If this device previously had a DIFFERENT assistant/
+    // manager account signed in (e.g. logout didn't clear it, or a
+    // second account was set up on the same phone before this fix),
+    // that other account's depotId can still be sitting there - and
+    // without this check we'd pull straight into a depot this account
+    // was never granted, showing their staff/settings as if they were
+    // ours. Refuse anything not in this account's own depotIds.
+    const ownedDepotIds = AppAuth.session.depotIds || {};
+    if(CloudSync.depotId && !ownedDepotIds[CloudSync.depotId]){
+      CloudSync.clearDepotId();
+      // DB itself was already populated by the module-level `load()` call
+      // from the flat, unscoped STORAGE_KEY - reset it too, otherwise
+      // initAll() below still paints the foreign depot's data for a beat
+      // before anything else catches it.
+      DB = defaultDB();
+      invalidateMemo();
+      persistLocal();
+    }
   }
   initAll();
   applyRoleUI();
