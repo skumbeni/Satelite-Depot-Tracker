@@ -580,7 +580,7 @@
   <button data-tab="equipment"><span class="di">🧰</span>Equipment and Requisites</button>
   <button data-tab="staff"><span class="di">👥</span>Staff</button>
   <button data-tab="payroll" class=""><span class="di">💵</span>Payroll</button>
-  <button data-tab="reports" class="" data-clerk-hide="true"><span class="di">📋</span>Reports</button>
+  <button data-tab="reports" class=""><span class="di">📋</span>Reports</button>
   <button data-tab="settings" class="" data-clerk-hide="true"><span class="di">⚙️</span>Settings</button>
   <button type="button" id="setRecoveryEmailBtn" style="margin-top:auto;"><span class="di">✉️</span>Recovery Email</button>
   <button type="button" id="biometricLoginBtn"><span class="di">👆</span>Biometric Login</button>
@@ -2753,8 +2753,8 @@ document.getElementById('tabs').addEventListener('click', e=>{
   const btn = e.target.closest('button[data-tab]');
   if(!btn) return;
   const tab = btn.dataset.tab;
-  if((tab === 'reports' || tab === 'settings') && typeof AppAuth !== 'undefined' && AppAuth.isClerk && AppAuth.isClerk()){
-    toast('Reports and Settings are only available to the Manager account');
+  if(tab === 'settings' && typeof AppAuth !== 'undefined' && AppAuth.isClerk && AppAuth.isClerk()){
+    toast('Settings is only available to the Manager account');
     closeDrawer();
     return;
   }
@@ -4067,12 +4067,15 @@ document.getElementById('genReportBtn').addEventListener('click', ()=>{
   }
   lines.push('');
 
-  /* ── FIXED STAFF (Manager-only export - Reports tab is gated to Managers) ── */
+  /* ── FIXED STAFF (Reports tab now open to Supervisors too - Supervisor-
+     tier/SDC records stay excluded for a Supervisor session, same as the
+     Staff tab and Payroll; Manager sessions see everyone) ── */
   lines.push('*FIXED STAFF*');
-  if(DB.staff.fixedStaff.length === 0){
+  const reportFixedStaff = DB.staff.fixedStaff.filter(s=> !(AppAuth.isClerk() && s.role === 'SDC'));
+  if(reportFixedStaff.length === 0){
     lines.push('No fixed staff recorded.');
   } else {
-    DB.staff.fixedStaff.forEach(st=>{
+    reportFixedStaff.forEach(st=>{
       lines.push(st.name + ' (' + staffRoleLabel(st.role) + ')');
       lines.push('  NRC: ' + (st.nrc || '-') + ' | NAPSA: ' + (st.napsa || '-'));
       lines.push('  Bank: ' + (st.bankBranch || '-') + ' | Acc No: ' + (st.accountNumber || '-'));
