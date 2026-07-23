@@ -918,6 +918,37 @@
         <button class="btn btn-primary btn-block" type="submit">Save Details</button>
       </form>
     </div>
+    <div class="card" data-clerk-hide="true">
+      <h2>Subscription <span class="sub">your plan and depot/login limits</span></h2>
+      <p class="muted" id="subLicenseSummary">—</p>
+
+      <div id="subRequestPending" style="display:none;">
+        <p class="muted">Your subscription request is pending review by the app admin.</p>
+        <p class="muted" id="subRequestPendingDetails" style="font-size:12px;"></p>
+        <button class="btn" type="button" id="subCancelRequestBtn">Cancel request</button>
+      </div>
+
+      <div id="subRequestForm">
+        <label>Plan</label>
+        <select id="subPlanSelect">
+          <option value="free">Free — 2 depots, 4 Supervisor logins</option>
+          <option value="tier3">3 depots — K120/mo · K650/6mo · K1,200/yr</option>
+          <option value="tier6">4–6 depots — K400/mo · K2,150/6mo · K4,000/yr</option>
+          <option value="tier12">7–12 depots — K800/mo · K4,350/6mo · K8,000/yr</option>
+          <option value="custom">13+ depots — custom pricing, contact admin</option>
+        </select>
+        <label>Billing period</label>
+        <select id="subBillingSelect">
+          <option value="monthly">Monthly</option>
+          <option value="sixmonth">6-Month</option>
+          <option value="annual">Annual</option>
+        </select>
+        <label>Note to admin <span class="muted">(optional)</span></label>
+        <input type="text" id="subRequestNote" placeholder="e.g. paid via MTN MoMo, ref 123456">
+        <button class="btn btn-primary btn-block" type="button" id="subRequestBtn" style="margin-top:10px;">Request Subscription</button>
+        <p class="muted" style="margin-top:4px;">Sends a request to the app admin. Your plan won't change until they approve it.</p>
+      </div>
+    </div>
     <div class="card">
       <h2>Bag Weight by Crop <span class="sub">kg per bag, used to calculate tonnage from bags</span></h2>
       <div id="bagWeightTable"></div>
@@ -4311,6 +4342,7 @@ function renderSettings(){
   renderStockEditor();
   updateBrandbar();
   renderCloudSyncCard();
+  renderSubscriptionCard();
 }
 
 /* Per-crop bag weight table - same live-update pattern as the Pay
@@ -4750,6 +4782,102 @@ document.getElementById('copyDepotCodeBtn').addEventListener('click', ()=>{
   const val = document.getElementById('currentDepotCodeDisplay').value;
   if(navigator.clipboard && val) navigator.clipboard.writeText(val).then(()=> toast('Depot code copied'));
 });
+
+/* ===================== SUBSCRIPTION REQUESTS =====================
+   Managers (ASSISTANT role) can't set their own license - only the
+   admin app can do that. This lets a manager submit a request (plan +
+   billing period + optional note) that lands in a new RTDB node,
+   `subscriptionRequests/$userId`, for the admin to review and action
+   from admin-2.html. One request per manager - submitting again just
+   overwrites the pending one. Requires this RTDB rule to be added
+   alongside the existing ones - same ownership pattern as depotManagers
+   (session must point at this userId), plus admin (fixed UID, same as
+   the license gate on satDepotManagerUsers/$userId/license) able to
+   read the whole node and write/delete any entry:
+     "subscriptionRequests": {
+       ".read": "auth != null && auth.uid == 'ygoh9eUo3hXdtZJCdzouiitN2U53'",
+       "$userId": {
+         ".read": "auth != null && (auth.uid == 'ygoh9eUo3hXdtZJCdzouiitN2U53' || root.child('satDepotManagerSessions').child(auth.uid).child('userId').val() == $userId)",
+         ".write": "auth != null && (auth.uid == 'ygoh9eUo3hXdtZJCdzouiitN2U53' || root.child('satDepotManagerSessions').child(auth.uid).child('userId').val() == $userId)",
+         ".validate": "!newData.exists() || (newData.hasChildren(['userId','username','plan','status']) && newData.child('userId').val() == $userId && newData.child('username').isString() && newData.child('plan').isString() && newData.child('status').val() == 'pending')"
+       }
+     } */
+const SUB_PLAN_LABELS = { free:'Free', tier3:'3 depots', tier6:'4–6 depots', tier12:'7–12 depots', custom:'13+ depots (custom)' };
+const SUB_BILLING_LABELS = { monthly:'Monthly', sixmonth:'6-Month', annual:'Annual' };
+
+function subLicenseSummaryText(lic){
+  if(!lic) return 'No license set on your account yet - free/grandfathered access.';
+  const statusText = lic.status === 'active' ? 'Active' : 'Inactive';
+  const expired = lic.expiresAt && Date.now() > lic.expiresAt;
+  const expiryText = lic.expiresAt ? ' · expires ' + new Date(lic.expiresAt).toLocaleDateString() + (expired ? ' (expired)' : '') : ' · no expiry';
+  const depotsText = lic.maxDepots != null ? lic.maxDepots + ' depots max' : 'unlimited depots';
+  const clerksText = lic.maxClerks != null ? lic.maxClerks + ' Supervisor logins max' : 'unlimited Supervisor logins';
+  return `${statusText}${expiryText} · ${depotsText} · ${clerksText}`;
+}
+
+async function renderSubscriptionCard(){
+  const summaryEl = document.getElementById('subLicenseSummary');
+  if(!summaryEl || !AppAuth.isAssistant()) return;
+  summaryEl.textContent = subLicenseSummaryText(AppAuth.session && AppAuth.session.license);
+
+  const pendingWrap = document.getElementById('subRequestPending');
+  const formWrap = document.getElementById('subRequestForm');
+  if(!CloudSync.configured || !AppAuth.session){ pendingWrap.style.display = 'none'; formWrap.style.display = ''; return; }
+
+  let req = null;
+  try{ req = await CloudSync._request(`subscriptionRequests/${AppAuth.session.userId}`, 'GET'); }
+  catch(e){ console.warn('Could not check subscription request status:', e); }
+
+  if(req && req.status === 'pending'){
+    pendingWrap.style.display = '';
+    formWrap.style.display = 'none';
+    document.getElementById('subRequestPendingDetails').textContent =
+      `Requested ${SUB_PLAN_LABELS[req.plan] || req.plan} (${SUB_BILLING_LABELS[req.billingPeriod] || req.billingPeriod})` +
+      (req.requestedAt ? ' on ' + new Date(req.requestedAt).toLocaleDateString() : '') +
+      (req.note ? ' — "' + req.note + '"' : '');
+  } else {
+    pendingWrap.style.display = 'none';
+    formWrap.style.display = '';
+  }
+}
+
+document.getElementById('subRequestBtn').addEventListener('click', async ()=>{
+  if(!AppAuth.session) return;
+  if(!CloudSync.configured){ toast('Cloud sync is not set up yet on this app'); return; }
+  const btn = document.getElementById('subRequestBtn');
+  const plan = document.getElementById('subPlanSelect').value;
+  const billingPeriod = document.getElementById('subBillingSelect').value;
+  const note = document.getElementById('subRequestNote').value.trim();
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try{
+    await CloudSync._request(`subscriptionRequests/${AppAuth.session.userId}`, 'PUT', {
+      userId: AppAuth.session.userId,
+      username: AppAuth.session.username,
+      name: AppAuth.session.name || '',
+      plan, billingPeriod,
+      note: note || null,
+      status: 'pending',
+      requestedAt: Date.now()
+    });
+    toast('Subscription request sent to the admin.');
+    await renderSubscriptionCard();
+  }catch(e){
+    toast('Could not send request: ' + (e.message || 'please try again'));
+  }
+  btn.disabled = false; btn.textContent = 'Request Subscription';
+});
+
+document.getElementById('subCancelRequestBtn').addEventListener('click', async ()=>{
+  if(!AppAuth.session) return;
+  try{
+    await CloudSync._request(`subscriptionRequests/${AppAuth.session.userId}`, 'DELETE');
+    toast('Request cancelled');
+  }catch(e){
+    toast('Could not cancel request: ' + (e.message || 'please try again'));
+  }
+  renderSubscriptionCard();
+});
+
 function updateBrandbar(){
   document.getElementById('depotTitle').textContent = DB.settings.depotName || 'Depot Manager';
   const parts = [DB.settings.district, DB.settings.province].filter(Boolean);
