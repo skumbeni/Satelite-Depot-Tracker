@@ -2050,6 +2050,36 @@ const AppAuth = {
   saveLocalSession(){ localStorage.setItem(SDM_SESSION_KEY, JSON.stringify(this.session)); },
   clearLocalSession(){ this.session = null; localStorage.removeItem(SDM_SESSION_KEY); },
 
+  // PHASE 18 — re-establishes this device's satDepotManagerSessions/{authUid}
+  // pointer for a RESTORED session (loadLocalSession, no login/signup
+  // involved). Login/signup already write this pointer themselves; this
+  // covers the gap where the local session survives but the anonymous
+  // Firebase Auth credential doesn't (cleared site data, fresh install with
+  // a restored backup, etc.) - without this, every RTDB call gated on the
+  // pointer (satDepotManager reads/writes, subscriptionRequests, depot
+  // index) 401s until the user manually logs out and back in.
+  // Safe/idempotent to call on every boot: it just PUTs the same shape
+  // sdmLogin/sdmSignup already write, keyed by whatever the *current*
+  // anonymous auth.uid happens to be. Failures are swallowed - if this
+  // genuinely can't write (e.g. offline), later calls just hit their own
+  // permission errors same as before, so this is pure upside.
+  async _refreshServerSession(){
+    if(!this.session || !CloudSync.configured) return;
+    try{
+      const authUser = await CloudSync.authReady;
+      if(!authUser) return;
+      const session = {
+        userId: this.session.userId,
+        role: this.session.role,
+        depotId: this.session.depotId || null,
+        depotIds: this.session.depotIds || {}
+      };
+      await CloudSync._request(`satDepotManagerSessions/${authUser.uid}`, 'PUT', session);
+    }catch(e){
+      console.warn('Could not refresh session pointer (non-fatal):', e);
+    }
+  },
+
   isAssistant(){ return !!this.session && this.session.role === 'ASSISTANT'; },
   isClerk(){ return !!this.session && this.session.role === 'CLERK'; },
 
@@ -5036,6 +5066,10 @@ function updateLicenseBanner(){
 // already saved on this device from a previous visit).
 async function bootAfterAuth(){
   document.getElementById('authGate').classList.remove('show');
+  // Re-establish this device's session pointer before anything below reads
+  // or writes RTDB - see AppAuth._refreshServerSession for why a restored
+  // (non-login) session needs this.
+  await AppAuth._refreshServerSession();
   if(AppAuth.isClerk() && AppAuth.session.depotId && CloudSync.depotId !== AppAuth.session.depotId){
     CloudSync.setDepotId(AppAuth.session.depotId);
   }
@@ -5091,21 +5125,13 @@ async function bootAfterAuth(){
   initAll();
   applyRoleUI();
   ScreenLock.init();
-  // Previously awaited AppAuth._refreshServerSession() here to cover the
-  // restored-session fast path (loadLocalSession skips login/signup
-  // entirely, so nothing else would refresh the pointer for it). Removed
-  // under PHASE 13: satDepotManagerSessions is client deny-all now, so
-  // that write would just be denied. In the normal case this is harmless -
-  // the same device's anonymous UID already has a valid pointer from its
-  // last real login/signup, written server-side by sdmLogin/sdmSignup.
-  // Known edge case: if a device's local session survives while its
-  // Firebase Auth anonymous credential is reset (not a same-device reload,
-  // but e.g. a manually restored localStorage backup onto a fresh
-  // install), that new UID has no matching pointer and depot reads will
-  // come back permission-denied (surfaced as CloudSync.status = 'denied')
-  // until the user logs in again - logging in re-establishes it via
-  // sdmLogin. Rare enough in practice not to warrant a dedicated
-  // refresh-session Cloud Function for now.
+  // PHASE 18 note: the restored-session pointer refresh that used to be
+  // missing here now happens at the very top of this function, via
+  // AppAuth._refreshServerSession() - see that method for the full
+  // rationale. (PHASE 13's "client deny-all" premise for
+  // satDepotManagerSessions no longer holds now that satDepotManagerUsers/
+  // satDepotManagerSessions are back to direct client writes under the
+  // Spark-plan revert, so this call is no longer a no-op.)
   if(CloudSync.depotId) await CloudSync.pullFromCloud(false);
   if(typeof renderDepotSwitcher === 'function') renderDepotSwitcher();
   if(AppAuth.isAssistant()){ await AppAuth.refreshLicense(); updateLicenseBanner(); }
