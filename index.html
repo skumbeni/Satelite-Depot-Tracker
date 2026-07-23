@@ -929,6 +929,7 @@
       </div>
 
       <div id="subRequestForm">
+        <p class="muted" style="margin-top:0;">New accounts start on the Free plan automatically. Pick a plan below to upgrade.</p>
         <label>Plan</label>
         <select id="subPlanSelect">
           <option value="free">Free — 2 depots, 4 Supervisor logins</option>
@@ -943,8 +944,11 @@
           <option value="sixmonth">6-Month</option>
           <option value="annual">Annual</option>
         </select>
-        <label>Note to admin <span class="muted">(optional)</span></label>
-        <input type="text" id="subRequestNote" placeholder="e.g. paid via MTN MoMo, ref 123456">
+        <div id="subPaymentInfo" style="display:none;">
+          <p class="muted" style="margin-top:10px;">Pay to: <b>+260977638790</b> / <b>+260960271128</b> (MTN/Airtel Mobile Money), then enter the transaction ID below.</p>
+          <label>Transaction ID <span class="muted">(required)</span></label>
+          <input type="text" id="subRequestNote" placeholder="e.g. MP240723.1234.A56789">
+        </div>
         <button class="btn btn-primary btn-block" type="button" id="subRequestBtn" style="margin-top:10px;">Request Subscription</button>
         <p class="muted" style="margin-top:4px;">Sends a request to the app admin. Your plan won't change until they approve it.</p>
       </div>
@@ -4806,7 +4810,7 @@ const SUB_PLAN_LABELS = { free:'Free', tier3:'3 depots', tier6:'4–6 depots', t
 const SUB_BILLING_LABELS = { monthly:'Monthly', sixmonth:'6-Month', annual:'Annual' };
 
 function subLicenseSummaryText(lic){
-  if(!lic) return 'No license set on your account yet - free/grandfathered access.';
+  if(!lic) return "Free plan (default) — 2 depots max, 4 Supervisor logins max.";
   const statusText = lic.status === 'active' ? 'Active' : 'Inactive';
   const expired = lic.expiresAt && Date.now() > lic.expiresAt;
   const expiryText = lic.expiresAt ? ' · expires ' + new Date(lic.expiresAt).toLocaleDateString() + (expired ? ' (expired)' : '') : ' · no expiry';
@@ -4819,6 +4823,7 @@ async function renderSubscriptionCard(){
   const summaryEl = document.getElementById('subLicenseSummary');
   if(!summaryEl || !AppAuth.isAssistant()) return;
   summaryEl.textContent = subLicenseSummaryText(AppAuth.session && AppAuth.session.license);
+  updateSubPaymentInfoVisibility();
 
   const pendingWrap = document.getElementById('subRequestPending');
   const formWrap = document.getElementById('subRequestForm');
@@ -4834,20 +4839,30 @@ async function renderSubscriptionCard(){
     document.getElementById('subRequestPendingDetails').textContent =
       `Requested ${SUB_PLAN_LABELS[req.plan] || req.plan} (${SUB_BILLING_LABELS[req.billingPeriod] || req.billingPeriod})` +
       (req.requestedAt ? ' on ' + new Date(req.requestedAt).toLocaleDateString() : '') +
-      (req.note ? ' — "' + req.note + '"' : '');
+      (req.transactionId ? ' — txn ' + req.transactionId : '');
   } else {
     pendingWrap.style.display = 'none';
     formWrap.style.display = '';
   }
 }
 
+// Free plan is the automatic default (no payment involved), so the
+// "Pay to" instructions and required transaction ID only apply once a
+// paid tier is picked.
+function updateSubPaymentInfoVisibility(){
+  const plan = document.getElementById('subPlanSelect').value;
+  document.getElementById('subPaymentInfo').style.display = plan === 'free' ? 'none' : '';
+}
+document.getElementById('subPlanSelect').addEventListener('change', updateSubPaymentInfoVisibility);
+
 document.getElementById('subRequestBtn').addEventListener('click', async ()=>{
   if(!AppAuth.session) return;
   if(!CloudSync.configured){ toast('Cloud sync is not set up yet on this app'); return; }
-  const btn = document.getElementById('subRequestBtn');
   const plan = document.getElementById('subPlanSelect').value;
   const billingPeriod = document.getElementById('subBillingSelect').value;
-  const note = document.getElementById('subRequestNote').value.trim();
+  const transactionId = document.getElementById('subRequestNote').value.trim();
+  if(plan !== 'free' && !transactionId){ toast('Enter the Mobile Money transaction ID for your payment.'); return; }
+  const btn = document.getElementById('subRequestBtn');
   btn.disabled = true; btn.textContent = 'Sending…';
   try{
     await CloudSync._request(`subscriptionRequests/${AppAuth.session.userId}`, 'PUT', {
@@ -4855,7 +4870,7 @@ document.getElementById('subRequestBtn').addEventListener('click', async ()=>{
       username: AppAuth.session.username,
       name: AppAuth.session.name || '',
       plan, billingPeriod,
-      note: note || null,
+      transactionId: transactionId || null,
       status: 'pending',
       requestedAt: Date.now()
     });
