@@ -67,7 +67,7 @@
   .brandbar h1{font-size:22px; margin:2px 0 0 0; color:#fff;}
   .brandbar .depotline{font-size:12px; color:rgba(255,255,255,.75); margin-top:2px;}
   .brandbar .datestamp{font-size:11px; color:rgba(255,255,255,.6); text-align:right; white-space:nowrap;}
-  .brandbar .datestamp-col{display:flex; flex-direction:column; align-items:flex-end; gap:5px;}
+  .brandbar .datestamp-col{display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex-shrink:0;}
   .brandbar .role-badge{
     font-size:10px; font-weight:800; letter-spacing:.6px; white-space:nowrap;
     padding:2px 8px; border-radius:20px; line-height:1.5;
@@ -565,6 +565,9 @@
     <button class="btn btn-gold btn-sm" id="installBannerBtn" type="button" style="margin:0; white-space:nowrap;">Install</button>
     <button class="install-banner-close" id="installBannerClose" type="button" aria-label="Dismiss">✕</button>
   </div>
+  <div class="install-banner" id="licenseBanner" style="display:none;background:#fef2f2;border-color:#fecaca;">
+    <span id="licenseBannerText">Your license is inactive - some actions are locked. Contact the app admin to renew.</span>
+  </div>
 </div>
 
 <nav class="tabs" id="tabs">
@@ -576,7 +579,7 @@
   <button data-tab="grain"><span class="di">🌾</span>Grain</button>
   <button data-tab="equipment"><span class="di">🧰</span>Equipment and Requisites</button>
   <button data-tab="staff"><span class="di">👥</span>Staff</button>
-  <button data-tab="payroll" class="" data-clerk-hide="true"><span class="di">💵</span>Payroll</button>
+  <button data-tab="payroll" class=""><span class="di">💵</span>Payroll</button>
   <button data-tab="reports" class="" data-clerk-hide="true"><span class="di">📋</span>Reports</button>
   <button data-tab="settings" class="" data-clerk-hide="true"><span class="di">⚙️</span>Settings</button>
   <button type="button" id="setRecoveryEmailBtn" style="margin-top:auto;"><span class="di">✉️</span>Recovery Email</button>
@@ -736,14 +739,15 @@
   <div class="tabpanel" id="tab-staff">
 
     <div class="card">
-      <h2>Fixed-Salary Staff <span class="sub">SDC &amp; guards, for record</span></h2>
+      <h2>Fixed-Salary Staff <span class="sub">Supervisors, Managers &amp; Guards, for record</span></h2>
       <div id="fixedStaffList"><div class="empty">No fixed staff added yet.</div></div>
       <hr class="section-divider">
       <form id="fixedStaffForm">
         <div class="row3">
           <input type="text" name="name" placeholder="Full name" required="">
           <select name="role" required="">
-            <option value="SDC" selected="selected">SDC</option>
+            <option value="SDC" selected="selected">Supervisor</option>
+            <option value="MA">Manager</option>
             <option value="Guard">Guard</option>
           </select>
           <input type="number" name="salary" placeholder="Salary (K/mo)" min="0" step="0.01" data-clerk-hide>
@@ -1749,10 +1753,11 @@ const CloudSync = {
         sidesteps that entirely.
 
      New node: satDepotManagerFinancial/{depotId}/salaries/{staffId} ->
-     number. Rule requires role != 'CLERK' (see rules file). The main
-     satDepotManager/{depotId} blob never carries `salary` on any
-     fixedStaff entry anymore - it's stripped on push and merged back in
-     on pull, for ASSISTANT sessions only.
+     number. Rule allows read for any depot-linked session (Supervisors
+     included, for Payroll access); write still requires role != 'CLERK'
+     (see rules file). The main satDepotManager/{depotId} blob never
+     carries `salary` on any fixedStaff entry anymore - it's stripped on
+     push and merged back in on pull, for either role now.
 
      Known accepted gap, same spirit as the ones already documented on
      satDepotManagerUsers: a CLERK device that had synced salary figures
@@ -1791,12 +1796,14 @@ const CloudSync = {
   },
 
   // Merges cloud salary figures back onto DB.staff.fixedStaff by `id`
-  // (never by array position - see PHASE 17 note above). Silently no-ops
-  // for a CLERK session: the rule denies the read, and a denied RTDB read
-  // just comes back empty rather than erroring, so there's nothing to
-  // merge and existing local entries simply keep no `salary` field.
+  // (never by array position - see PHASE 17 note above). Supervisors can
+  // read this now (Payroll tab access), so this runs for both roles;
+  // only _pushFinancial() below stays Manager-only.
+  // Both roles can now pull salary figures (Supervisors have Payroll
+  // access) - the RTDB rule allows CLERK reads on this node but still
+  // denies CLERK writes, matching _pushFinancial()'s Manager-only skip
+  // below.
   async _pullFinancial(){
-    if(typeof AppAuth !== 'undefined' && AppAuth.session && !AppAuth.isAssistant()) return;
     try{
       const salaries = await this._request(this._financialPath(), 'GET');
       if(salaries) DB.staff.fixedStaff.forEach(s=>{ if(salaries[s.id] !== undefined) s.salary = salaries[s.id]; });
@@ -2010,6 +2017,39 @@ const AppAuth = {
 
   isAssistant(){ return !!this.session && this.session.role === 'ASSISTANT'; },
   isClerk(){ return !!this.session && this.session.role === 'CLERK'; },
+
+  // No license record on the account at all = grandfathered/not yet
+  // metered (so existing accounts aren't locked out the moment this
+  // ships). Once an admin sets a license, status/expiresAt govern access.
+  hasActiveLicense(){
+    const lic = this.session && this.session.license;
+    if(!lic) return true;
+    if(lic.status !== 'active') return false;
+    if(lic.expiresAt && Date.now() > lic.expiresAt) return false;
+    return true;
+  },
+  // maxDepots is only enforced once an admin sets it; null/absent = unlimited.
+  depotLimitReached(){
+    const lic = this.session && this.session.license;
+    if(!lic || lic.maxDepots == null) return false;
+    const count = Object.keys((this.session && this.session.depotIds) || {}).length;
+    return count >= lic.maxDepots;
+  },
+
+  // Re-pulls this manager's license from the cloud so a change made in
+  // the Admin panel (possibly on another device) takes effect without
+  // waiting for the next login. Best-effort - offline or errors just
+  // keep whatever was cached in the local session.
+  async refreshLicense(){
+    if(!this.session || !CloudSync.configured) return;
+    try{
+      const lic = await _sdmRtdbGet(`satDepotManagerUsers/${this.session.userId}/license`);
+      this.session.license = lic || null;
+      this.saveLocalSession();
+    }catch(e){ console.warn('License refresh failed, using cached value:', e); }
+  },
+
+  // ---- End license helpers ----
   async login(username, password, depotId){
     username = (username||'').trim();
     if(!username || !password) throw new Error('Enter your username and password.');
@@ -2052,7 +2092,8 @@ const AppAuth = {
     this.session = {
       userId: id, username: user.username, name: user.name, role: user.role,
       depotId: user.depotId || null,
-      depotIds: user.depotIds || {}
+      depotIds: user.depotIds || {},
+      license: user.license || null
     };
     this.saveLocalSession();
     return this.session;
@@ -2090,7 +2131,8 @@ const AppAuth = {
     this.session = {
       userId: newId, username, name, role,
       depotId: record.depotId || null,
-      depotIds: record.depotIds || {}
+      depotIds: record.depotIds || {},
+      license: null
     };
     this.saveLocalSession();
     return this.session;
@@ -2179,6 +2221,27 @@ const AppAuth = {
     }catch(e){ console.warn('listClerksInDepot failed:', e); return []; }
   },
 
+  // Seat metering for license.maxClerks: sums Supervisor logins across
+  // every depot this Manager owns. N small indexed queries (one per
+  // depot) rather than one query, since satDepotManagerUsers has no
+  // manager-id index to filter by directly.
+  async countMyClerks(){
+    if(!this.isAssistant()) return 0;
+    const depotIds = Object.keys((this.session && this.session.depotIds) || {});
+    let total = 0;
+    for(const id of depotIds){
+      const clerks = await this.listClerksInDepot(id);
+      total += clerks.length;
+    }
+    return total;
+  },
+  // maxClerks is only enforced once an admin sets it; null/absent = unlimited.
+  clerkLimitReached(currentCount){
+    const lic = this.session && this.session.license;
+    if(!lic || lic.maxClerks == null) return false;
+    return currentCount >= lic.maxClerks;
+  },
+
   // Moves a clerk's single depotId to a different depot the Assistant
   // also oversees - the RTDB rule for satDepotManagerUsers/$userId/depotId
   // enforces that the caller's own session lists both the clerk's current
@@ -2202,6 +2265,11 @@ const AppAuth = {
   // out-of-band (WhatsApp, in person, etc.); there's no email delivery.
   async createClerkAccount({ name, username, password, depotId }){
     if(!this.isAssistant()) throw new Error('Only Managers can create Supervisor logins.');
+    if(!this.hasActiveLicense()) throw new Error('Your license is inactive or expired - contact the app admin to renew.');
+    const currentClerks = await this.countMyClerks();
+    if(this.clerkLimitReached(currentClerks)){
+      throw new Error(`You've reached your licensed limit of ${this.session.license.maxClerks} Supervisor logins - contact the app admin to add more.`);
+    }
     name = (name||'').trim(); username = (username||'').trim();
     if(!name || !username || !password) throw new Error('Fill in all fields.');
     if(password.length < 6) throw new Error('Password must be at least 6 characters.');
@@ -2636,6 +2704,15 @@ function escapeHtml(s){
   return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function fmtK(n){ return 'K'+(Math.round((n+Number.EPSILON)*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+// Fixed-Salary Staff roles are stored as 'SDC'/'MA'/'Guard' (unchanged,
+// so existing records and payroll grouping never need migrating) but
+// always DISPLAY as Supervisor/Manager/Guard - this is the one place
+// that mapping happens.
+function staffRoleLabel(role){
+  if(role === 'SDC') return 'Supervisor';
+  if(role === 'MA') return 'Manager';
+  return role;
+}
 /* Grain is tracked in bags everywhere for input simplicity, but depots
    also need tonnage for FRA-style reporting - derive it from the
    depot's configured standard bag weight rather than hardcoding 50kg,
@@ -2676,8 +2753,8 @@ document.getElementById('tabs').addEventListener('click', e=>{
   const btn = e.target.closest('button[data-tab]');
   if(!btn) return;
   const tab = btn.dataset.tab;
-  if((tab === 'payroll' || tab === 'reports' || tab === 'settings') && typeof AppAuth !== 'undefined' && AppAuth.isClerk && AppAuth.isClerk()){
-    toast('Payroll, Reports, and Settings are only available to the Manager account');
+  if((tab === 'reports' || tab === 'settings') && typeof AppAuth !== 'undefined' && AppAuth.isClerk && AppAuth.isClerk()){
+    toast('Reports and Settings are only available to the Manager account');
     closeDrawer();
     return;
   }
@@ -3146,7 +3223,10 @@ function renderStaffTab(){
 }
 
 function renderFixedStaff(){
-  const list = DB.staff.fixedStaff;
+  // Supervisors (CLERK) never see Supervisor-tier (SDC) staff records at
+  // all - not just salary, the whole entry - same idea as salary/transfer
+  // already being Manager-only below.
+  const list = DB.staff.fixedStaff.filter(s=> !(AppAuth.isClerk() && s.role === 'SDC'));
   const container = document.getElementById('fixedStaffList');
   if(list.length === 0){ container.innerHTML = '<div class="empty">No fixed staff added yet.</div>'; return; }
   const frag = document.createDocumentFragment();
@@ -3155,7 +3235,7 @@ function renderFixedStaff(){
     const top = document.createElement('div'); top.className = 'top';
     const left = document.createElement('div');
     const nameEl = document.createElement('div'); nameEl.className = 'name'; nameEl.textContent = s.name;
-    const roleEl = document.createElement('div'); roleEl.className = 'role'; roleEl.textContent = s.role;
+    const roleEl = document.createElement('div'); roleEl.className = 'role'; roleEl.textContent = staffRoleLabel(s.role);
     left.appendChild(nameEl); left.appendChild(roleEl);
     if(s.nrc || s.napsa){
       const metaEl = document.createElement('div'); metaEl.className = 'meta';
@@ -3646,8 +3726,11 @@ document.getElementById('calcPayrollBtn').addEventListener('click', ()=>{
     logs.push(w);
   }
 
-  /* Fixed staff (SDC & Guards), pro-rated for the chosen period range */
-  const fixedStaffPay = DB.staff.fixedStaff.map(st=>({
+  /* Fixed staff (Supervisors, Managers & Guards), pro-rated for the chosen
+     period range. Supervisor-tier (SDC) records are excluded from a
+     Supervisor's own payroll run - same restriction as the Staff tab. */
+  const visibleFixedStaff = DB.staff.fixedStaff.filter(s=> !(AppAuth.isClerk() && s.role === 'SDC'));
+  const fixedStaffPay = visibleFixedStaff.map(st=>({
     staff: st, amount: fixedStaffPayForPeriod(st, from, to)
   }));
 
@@ -3680,12 +3763,12 @@ document.getElementById('calcPayrollBtn').addEventListener('click', ()=>{
   let fixedStaffTotal = 0;
 
   if(fixedStaffPay.length > 0){
-    html += '<h3 style="margin:0 0 8px; font-size:14px;">Fixed Staff (SDCs &amp; Guards) — Period: ' + fmtDate(from) + ' to ' + fmtDate(to) + '</h3>';
+    html += '<h3 style="margin:0 0 8px; font-size:14px;">Fixed Staff — Period: ' + fmtDate(from) + ' to ' + fmtDate(to) + '</h3>';
     fixedStaffPay.forEach(rec=>{
       const st = rec.staff;
       fixedStaffTotal += rec.amount;
       html += '<div class="worker-card"><div class="top"><div>';
-      html += '<div class="name">' + escapeHtml(st.name) + '</div><div class="role">' + escapeHtml(st.role) + '</div>';
+      html += '<div class="name">' + escapeHtml(st.name) + '</div><div class="role">' + escapeHtml(staffRoleLabel(st.role)) + '</div>';
       if(st.nrc) html += '<div class="meta">NRC: ' + escapeHtml(st.nrc) + '</div>';
       if(st.napsa) html += '<div class="meta">NAPSA: ' + escapeHtml(st.napsa) + '</div>';
       if(st.bankBranch || st.accountNumber) html += '<div class="meta">' + escapeHtml(st.bankBranch||'') + (st.accountNumber ? ' — Acc: ' + escapeHtml(st.accountNumber) : '') + '</div>';
@@ -3769,10 +3852,10 @@ document.getElementById('sharePayrollBtn').addEventListener('click', ()=>{
   lines.push('');
 
   if(_payrollCache.fixedStaffPay && _payrollCache.fixedStaffPay.length > 0){
-    lines.push('*FIXED STAFF (SDCs & GUARDS) — pro-rated*');
+    lines.push('*FIXED STAFF — pro-rated*');
     _payrollCache.fixedStaffPay.forEach(rec=>{
       const st = rec.staff;
-      let name = st.name + ' (' + st.role + ')';
+      let name = st.name + ' (' + staffRoleLabel(st.role) + ')';
       if(st.nrc) name += ' | NRC: ' + st.nrc;
       if(st.napsa) name += ' | NAPSA: ' + st.napsa;
       if(st.bankBranch || st.accountNumber) name += ' | ' + (st.bankBranch||'') + (st.accountNumber ? ' Acc: ' + st.accountNumber : '');
@@ -3828,13 +3911,13 @@ document.getElementById('genRemotePayBtn').addEventListener('click', ()=>{
   let rowNum = 0;
 
   if(_payrollCache.fixedStaffPay && _payrollCache.fixedStaffPay.length > 0){
-    lines.push('*Fixed Staff (SDCs & Guards)*');
+    lines.push('*Fixed Staff*');
     _payrollCache.fixedStaffPay.forEach(rec=>{
       const st = rec.staff;
       grandTotal += rec.amount;
       rowNum++;
       const bank = (st.bankBranch || '-') + (st.accountNumber ? ' Acc: ' + st.accountNumber : '');
-      lines.push(rowNum + '. ' + st.name + ' (' + st.role + ') | NRC: ' + (st.nrc||'-') + ' | ' + bank + ' | ' + fmtK(rec.amount));
+      lines.push(rowNum + '. ' + st.name + ' (' + staffRoleLabel(st.role) + ') | NRC: ' + (st.nrc||'-') + ' | ' + bank + ' | ' + fmtK(rec.amount));
     });
     lines.push('');
   }
@@ -3984,13 +4067,13 @@ document.getElementById('genReportBtn').addEventListener('click', ()=>{
   }
   lines.push('');
 
-  /* ── FIXED STAFF: SDCs & GUARDS ── */
-  lines.push('*FIXED STAFF (SDCs & GUARDS)*');
+  /* ── FIXED STAFF (Manager-only export - Reports tab is gated to Managers) ── */
+  lines.push('*FIXED STAFF*');
   if(DB.staff.fixedStaff.length === 0){
     lines.push('No fixed staff recorded.');
   } else {
     DB.staff.fixedStaff.forEach(st=>{
-      lines.push(st.name + ' (' + st.role + ')');
+      lines.push(st.name + ' (' + staffRoleLabel(st.role) + ')');
       lines.push('  NRC: ' + (st.nrc || '-') + ' | NAPSA: ' + (st.napsa || '-'));
       lines.push('  Bank: ' + (st.bankBranch || '-') + ' | Acc No: ' + (st.accountNumber || '-'));
       if(st.salary) lines.push('  Salary: ' + fmtK(st.salary) + '/mo');
@@ -4592,6 +4675,8 @@ document.getElementById('linkDepotBtn').addEventListener('click', async ()=>{
   const code = document.getElementById('depotCodeInput').value.trim().toUpperCase();
   if(!code){ toast('Enter a depot code first'); return; }
   if(!CloudSync.configured){ toast('Cloud sync is not set up yet on this app'); return; }
+  if(!AppAuth.hasActiveLicense()){ toast('Your license is inactive - contact the app admin to renew.'); return; }
+  if(AppAuth.depotLimitReached()){ toast("You've reached your licensed depot limit - contact the app admin to add more."); return; }
   CloudSync.setDepotId(code);
   renderCloudSyncCard();
   // Must land before the pull below - otherwise an Assistant's first pull
@@ -4609,6 +4694,8 @@ document.getElementById('addDepotIndexBtn').addEventListener('click', async ()=>
   const label = document.getElementById('addDepotIndexLabel').value.trim();
   if(!code){ toast('Enter a depot code first'); return; }
   if(!CloudSync.configured){ toast('Cloud sync is not set up yet on this app'); return; }
+  if(!AppAuth.hasActiveLicense()){ toast('Your license is inactive - contact the app admin to renew.'); return; }
+  if(AppAuth.depotLimitReached()){ toast("You've reached your licensed depot limit - contact the app admin to add more."); return; }
   await DepotIndex.addEntry(code, label);
   await AppAuth.rememberDepotForAssistant(code);
   document.getElementById('addDepotIndexCode').value = '';
@@ -4623,6 +4710,8 @@ document.getElementById('createNewDepotBtn').addEventListener('click', async ()=
   const province = document.getElementById('newDepotProvinceInput').value.trim();
   if(!depotName){ toast('Enter the new depot\'s name first'); return; }
   if(!CloudSync.configured){ toast('Cloud sync is not set up yet on this app'); return; }
+  if(!AppAuth.hasActiveLicense()){ toast('Your license is inactive - contact the app admin to renew.'); return; }
+  if(AppAuth.depotLimitReached()){ toast("You've reached your licensed depot limit - contact the app admin to add more."); return; }
   const btn = document.getElementById('createNewDepotBtn');
   btn.disabled = true;
   btn.textContent = 'Creating…';
@@ -4785,6 +4874,16 @@ function applyRoleUI(){
   }
   updateRoleBadge();
   applyViewOnlyForCurrentDepot();
+  updateLicenseBanner();
+}
+
+// Only Managers hold a license; Supervisors ride on whichever depot
+// they're pinned to and aren't shown this.
+function updateLicenseBanner(){
+  const el = document.getElementById('licenseBanner');
+  if(!el) return;
+  const show = AppAuth.isAssistant() && !AppAuth.hasActiveLicense();
+  el.style.display = show ? '' : 'none';
 }
 
 // Runs once login/signup succeeds (or immediately, if a session was
@@ -4863,6 +4962,7 @@ async function bootAfterAuth(){
   // refresh-session Cloud Function for now.
   if(CloudSync.depotId) await CloudSync.pullFromCloud(false);
   if(typeof renderDepotSwitcher === 'function') renderDepotSwitcher();
+  if(AppAuth.isAssistant()){ await AppAuth.refreshLicense(); updateLicenseBanner(); }
 }
 
 function bootApp(){
